@@ -49,7 +49,7 @@ async function loadSwing(){
 }
 
 async function loadState(){
-  try{ const r=await fetch(`/api/state?ts=${Date.now()}`,{cache:'no-store'}); const b=await r.json(); if(!r.ok||b.status!=='ok')throw new Error(b.message||`HTTP ${r.status}`); engineState=b.data; $('engine-dot').className='dot ok'; $('engine-health').textContent=`D1 ${/^[23]\./.test(engineState?.publisher_version||'')?'rich':'live'}`; }
+  try{ const r=await fetch(`/api/state?ts=${Date.now()}`,{cache:'no-store'}); const b=await r.json(); if(!r.ok||b.status!=='ok')throw new Error(b.message||`HTTP ${r.status}`); engineState=b.data; $('engine-dot').className='dot ok'; $('engine-health').textContent=`D1 ${/^[234]\./.test(engineState?.publisher_version||'')?'rich':'live'}`; }
   catch(e){ $('engine-dot').className='dot err'; $('engine-health').textContent='D1 error'; console.error(e); }
   renderAll();
 }
@@ -82,9 +82,10 @@ function renderExecution(){
   $('bias-state').textContent=bias; $('bias-state').className=`big-state ${dirClass(bias)}`; $('bias-note').textContent=`score ${fmtNum(t.clear_score,2)} · tactical ${t.state||'—'}`;
   $('htf-state').textContent=h.gate||'—'; $('htf-state').className=`big-state ${h.allowed?'watch':'short'}`; $('htf-note').textContent=h.allowed?'HTF no veta · no crea entrada':(h.gate_reason||h.final_state||'BLOCKED');
 
-  const G=geometry(); const L=G.LONG||{}, S=G.SHORT||{};
-  $('long-plan').innerHTML=metric('Status',L.status||'PREVIEW',L.status==='ARMED'?'pos':'warn')+metric('Entry',fmtPrice(L.entry),'pos')+metric('SL',fmtPrice(L.sl),'neg')+metric('TP1',fmtPrice(L.tp1),'pos')+metric('TP2',fmtPrice(L.tp2),'pos')+metric('TP3',fmtPrice(L.tp3),'pos')+metric('Risk',fmtPrice(L.risk));
-  $('short-plan').innerHTML=metric('Status',S.status||'PREVIEW',S.status==='ARMED'?'neg':'warn')+metric('Entry',fmtPrice(S.entry),'neg')+metric('SL',fmtPrice(S.sl),'neg')+metric('TP1',fmtPrice(S.tp1),'pos')+metric('TP2',fmtPrice(S.tp2),'pos')+metric('TP3',fmtPrice(S.tp3),'pos')+metric('Risk',fmtPrice(S.risk));
+  const G=geometry(); const L=G.LONG||{}, S=G.SHORT||{}; const trig=!!t.trigger?.confirmed;
+  const longConfirmed=(action==='LONG')||(trig&&bias==='LONG'), shortConfirmed=(action==='SHORT')||(trig&&bias==='SHORT');
+  $('long-plan').innerHTML=metric('Status',longConfirmed?'CONFIRMED':(L.status||'PREVIEW'),longConfirmed?'pos':'warn')+metric('Entry',fmtPrice(L.entry),'long-entry')+metric('SL',fmtPrice(L.sl),'long-sl')+metric('TP1',fmtPrice(L.tp1),'long-tp')+metric('TP2',fmtPrice(L.tp2),'long-tp')+metric('TP3',fmtPrice(L.tp3),'long-tp')+metric('Risk',fmtPrice(L.risk));
+  $('short-plan').innerHTML=metric('Status',shortConfirmed?'CONFIRMED':(S.status||'PREVIEW'),shortConfirmed?'neg':'warn')+metric('Entry',fmtPrice(S.entry),'short-entry')+metric('SL',fmtPrice(S.sl),'short-sl')+metric('TP1',fmtPrice(S.tp1),'short-tp')+metric('TP2',fmtPrice(S.tp2),'short-tp')+metric('TP3',fmtPrice(S.tp3),'short-tp')+metric('Risk',fmtPrice(S.risk));
 
   const reasons=(h.reasons||[]).map(x=>`<li>${x}</li>`).join('');
   $('decision-detail').innerHTML=`<div class="decision-main ${action==='LONG'?'pos':action==='SHORT'?'neg':''}">${action}</div><div class="small">${why}</div>`+metric('Directional bias',bias,dirClass(bias)==='long'?'pos':dirClass(bias)==='short'?'neg':'warn')+metric('Actionable',d.actionable?'YES':'NO',d.actionable?'pos':'warn')+metric('Tactical state',t.state||'—')+metric('HTF gate',h.gate||'—',h.allowed?'pos':'neg')+metric('Final state',h.final_state||'—')+(reasons?`<ul class="reason-list">${reasons}</ul>`:'');
@@ -97,8 +98,12 @@ function renderProjection(){
 }
 
 function renderPivot(){
-  const p=astate()?.tac||{}; const iso=p.next_pivot_utc; if(!iso){$('pivot-state').textContent='—';$('pivot-note').textContent='sin pivote Source para este activo';return;}
-  const mins=Math.max(0,(Date.parse(iso)-Date.now())/60000); $('pivot-state').textContent=mins<60?`${Math.floor(mins)}m`:`${Math.floor(mins/60)}h ${Math.floor(mins%60)}m`; $('pivot-state').className=`big-state ${dirClass(p.direction)}`; $('pivot-note').textContent=`${p.label||p.direction||''} · ${mtyTime(p.next_pivot_monterrey||iso)}`;
+  const tac=astate()?.tac||{}; const rp=rich().pivots||{}; const n=(rp.next||[])[0]||{};
+  const iso=tac.next_pivot_utc||n.pivot_utc;
+  if(!iso){$('pivot-state').textContent='—';$('pivot-note').textContent='sin pivote publicado';return;}
+  const mins=Math.max(0,(Date.parse(iso)-Date.now())/60000); const label=tac.label||n.tac_label||tac.direction||'';
+  $('pivot-state').textContent=mins<60?`${Math.floor(mins)}m`:`${Math.floor(mins/60)}h ${Math.floor(mins%60)}m`; $('pivot-state').className=`big-state ${dirClass(label)}`;
+  const obs=rp.decision_effect==='NONE'?' · OBSERVATIONAL':''; $('pivot-note').textContent=`${label} · ${mtyTime(tac.next_pivot_monterrey||n.pivot_local||iso)}${obs}`;
 }
 
 function renderHTF(){
@@ -113,9 +118,11 @@ function renderLevels(){
 }
 
 function renderPivots(){
-  const p=rich().pivots||{}; const next=p.next||[]; const active=p.active_windows||[]; if(!next.length){$('pivots-panel').innerHTML='<div class="small">No hay calendario Source publicado para este activo.</div>';return;}
+  const p=rich().pivots||{}; const next=p.next||[]; const active=p.active_windows||[]; if(!next.length){$('pivots-panel').innerHTML='<div class="small">No hay calendario TAC/Source publicado.</div>';return;}
   const rows=next.slice(0,6).map(x=>`<div class="pivot-row"><div class="pivot-time">${x.pivot_local_display||mtyTime(x.pivot_local||x.pivot_utc)}</div><div class="pivot-label ${dirClass(x.tac_label)==='long'?'pos':dirClass(x.tac_label)==='short'?'neg':'warn'}">${x.tac_label||'—'}</div><div>${x.event||'—'}</div></div>`).join('');
-  const chips=active.map(x=>`<span class="window-chip">${x.window_type||'WINDOW'} · ${x.polarity||''}</span>`).join(''); $('pivots-panel').innerHTML=`<div class="pivot-list">${rows}</div>${chips?`<div class="small" style="margin-top:8px">Ventanas activas</div>${chips}`:''}`;
+  const chips=active.map(x=>`<span class="window-chip">${x.window_type||'WINDOW'} · ${x.polarity||''}</span>`).join('');
+  const note=p.decision_effect==='NONE'?'<div class="small warn" style="margin-bottom:7px">Calendario compartido mostrado como contexto · no entra al score ETH/XRP.</div>':'';
+  $('pivots-panel').innerHTML=`${note}<div class="pivot-list">${rows}</div>${chips?`<div class="small" style="margin-top:8px">Ventanas activas</div>${chips}`:''}`;
 }
 
 function renderOptions(){
@@ -134,10 +141,17 @@ function renderSwing(){
 }
 
 function renderSystem(){
-  const sys=engineState?.system||{}; const f=(label,o)=>metric(label,o?.status?`${o.status} · ${o.age_seconds??'—'}s`:'—',o?.status==='OK'&&(o.age_seconds??9999)<360?'pos':'warn'); $('engine-age').textContent=engineState?.generated_utc?ageText(engineState.generated_utc):'—'; $('system-panel').innerHTML=metric('Publisher',engineState?.publisher_version||'—',/^[23]\./.test(String(engineState?.publisher_version||''))?'pos':'warn')+metric('State hash',engineState?.state_hash||'—')+f('Decision',sys.decision_file)+f('Screener',sys.screener_file)+f('Options',sys.options_file)+metric('Orders',engineState?.orders_enabled?'ENABLED':'DISABLED',engineState?.orders_enabled?'neg':'pos');
+  const sys=engineState?.system||{}; const f=(label,o)=>metric(label,o?.status?`${o.status} · ${o.age_seconds??'—'}s`:'—',o?.status==='OK'&&(o.age_seconds??9999)<360?'pos':'warn'); $('engine-age').textContent=engineState?.generated_utc?ageText(engineState.generated_utc):'—'; $('system-panel').innerHTML=metric('Publisher',engineState?.publisher_version||'—',/^[234]\./.test(String(engineState?.publisher_version||''))?'pos':'warn')+metric('State hash',engineState?.state_hash||'—')+f('Decision',sys.decision_file)+f('Screener',sys.screener_file)+f('Options',sys.options_file)+metric('Orders',engineState?.orders_enabled?'ENABLED':'DISABLED',engineState?.orders_enabled?'neg':'pos');
 }
 
-function renderAll(){ updatePriceStrip(); const a=astate(); if(!a){$('execution-state').textContent='WAIT';$('execution-note').textContent='Esperando snapshot D1.';drawChart();return;} renderExecution();renderProjection();renderPivot();renderHTF();renderLevels();renderPivots();renderOptions();renderInternals();renderSwing();renderSystem();drawChart(); }
+function renderCoverage(){
+  const r=rich(), profiles=r.context_profiles||{}, fr=r.fractal||{}, tr=fr.trajectory||{}, piv=r.pivots||{};
+  const hasProfiles=Object.keys(profiles).length>0||Object.keys(r.htf_detail||{}).length>0; const hasFractal=(tr.times_utc||[]).length>1 && ((tr.median||tr.source_median||tr.technical_median||[]).length>1); const hasPivots=(piv.next||[]).length>0;
+  const ok=hasProfiles&&hasFractal&&hasPivots; const el=$('chart-coverage'); if(el){el.textContent=ok?'FORK DATA COMPLETE':`MISSING ${[!hasProfiles?'TA':'',!hasFractal?'FRACTAL':'',!hasPivots?'PIVOTS':''].filter(Boolean).join(' / ')}`;el.className=`badge ${ok?'ok':'bad'}`;}
+  const legend=$('fractal-legend'); if(legend) legend.textContent=asset==='BTC'?'Source fractal median / Q20–Q80':'Technical fractal median / Q20–Q80';
+}
+
+function renderAll(){ renderCoverage(); updatePriceStrip(); const a=astate(); if(!a){$('execution-state').textContent='WAIT';$('execution-note').textContent='Esperando snapshot D1.';drawChart();return;} renderExecution();renderProjection();renderPivot();renderHTF();renderLevels();renderPivots();renderOptions();renderInternals();renderSwing();renderSystem();drawChart(); }
 
 function profileLevels(){
   const r=rich(), p=r.context_profiles||{}; const out=[]; const colors={POC:'#9a63c8',VWAP:'#e38b00',TWAP:'#4f7db7',VAH:'#198aa5',VAL:'#198aa5'};
@@ -153,7 +167,13 @@ function profileLevels(){
   for(const key of keys){const x=source[key];if(!x)continue;for(const n of ['POC','VWAP','TWAP','VAH','VAL']){const v=x[n]??x[n.toLowerCase()];if(Number.isFinite(+v))out.push({value:+v,label:`${key} ${n}`,color:colors[n],dash:n==='VAH'||n==='VAL'?[2,4]:[4,3],kind:'profile'});}}
   return out;
 }
-function tacticalLevels(){ const G=geometry(), out=[]; for(const [side,col] of [['LONG','#15985a'],['SHORT','#d84a4a']]){const g=G[side]||{}; for(const [k,lbl,dash] of [['entry',`${side} E`,[]],['sl',`${side} SL`,[5,4]],['tp1',`${side} TP1`,[4,3]],['tp2',`${side} TP2`,[2,4]],['tp3',`${side} TP3`,[2,4]]])if(Number.isFinite(+g[k]))out.push({value:+g[k],label:lbl,color:col,dash,kind:'tac'});} return out; }
+function tacticalLevels(){
+  const G=geometry(), out=[], a=astate()||{}, t=a.tactical||{}, confirmed=!!t.trigger?.confirmed, candidate=(a.decision?.candidate||t.candidate_side||'').toUpperCase(), active=(a.decision?.action||'WAIT').toUpperCase();
+  // Exact fork palette: entries yellow/orange, SL dark/light red, TP dark/light green.
+  const palettes={LONG:{entry:'#ffd400',sl:'#a61b1b',tp:'#1b8f3a'},SHORT:{entry:'#ffb347',sl:'#ff6b6b',tp:'#7cfc98'}};
+  for(const side of ['LONG','SHORT']){const g=G[side]||{},pal=palettes[side],isConfirmed=(active===side)||(confirmed&&candidate===side);
+    for(const [k,sfx,dash] of [['entry','E',[]],['sl','SL',[]],['tp1','TP1',[4,3]],['tp2','TP2',[4,3]],['tp3','TP3',[4,3]]]){if(!Number.isFinite(+g[k]))continue; const color=k==='entry'?pal.entry:k==='sl'?pal.sl:pal.tp; const mark=(k==='entry'&&isConfirmed)?'✓ ':''; out.push({value:+g[k],label:`${mark}${side} ${sfx}`,color,dash,kind:'tac',side,key:k,confirmed:isConfirmed,alpha:(candidate&&candidate!==side&&active==='WAIT')?.62:1});}
+  } return out; }
 function swingLevels(){ const p=swingState?.plan;if(!p)return[];return[{value:p.entry,label:'SW ENTRY',color:'#e38b00',dash:[]},{value:p.sl,label:'SW SL',color:'#d84a4a',dash:[]},{value:p.tp1,label:'SW TP1',color:'#e38b00',dash:[4,3]},{value:p.tp2,label:'SW TP2',color:'#e38b00',dash:[2,4]}].filter(x=>Number.isFinite(+x.value)); }
 
 function distributeLabelYs(items, yFn, top, bottom, minGap=13){
@@ -199,6 +219,7 @@ function drawChart(){
   const maxN={'1m':8,'5m':24,'15m':48,'1h':96,'4h':96}[chartTf]||48; times=times.slice(0,maxN);med=med.slice(0,maxN);q20=q20.slice(0,maxN);q80=q80.slice(0,maxN);
   const tMin=series[0].t; let tMax=series.at(-1).t;
   if(chartMode==='TACTICAL'&&times.length){const ft=Date.parse(times.at(-1));if(Number.isFinite(ft))tMax=Math.max(tMax,ft);}
+  if(chartMode==='TACTICAL'){const horizon=series.at(-1).t+24*3600e3; const fp=(rich().pivots?.next||[]).slice(0,6).map(x=>Date.parse(x.pivot_utc)).filter(x=>Number.isFinite(x)&&x<=horizon); if(fp.length)tMax=Math.max(tMax,...fp);}
   const futureVals=chartMode==='TACTICAL'?[...med,...q20,...q80].filter(Number.isFinite):[];
   let lo=Math.min(...series.map(c=>c.l),...levels.map(x=>x.value),...futureVals); let hi=Math.max(...series.map(c=>c.h),...levels.map(x=>x.value),...futureVals);
   if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=px*.98;hi=px*1.02;}
@@ -213,10 +234,10 @@ function drawChart(){
     ctx.fillText(fmtPrice(val),wide?cssW-64:plotRight+7,yy+3);
   }
 
-  // TAC pivots are intentionally subtle, dotted and BEHIND price. No text on the chart.
+  // Fork parity: last 3 + future TAC/Source pivots, vertical dotted and BEHIND price.
   if(chartMode==='TACTICAL'){
-    const piv=rich().pivots?.next||[];
-    piv.forEach(p=>{const tt=Date.parse(p.pivot_utc);if(!Number.isFinite(tt)||tt<tMin||tt>tMax)return;const xx=xTime(tt);ctx.save();ctx.strokeStyle='rgba(85,85,85,.55)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ph);ctx.stroke();ctx.restore();});
+    const pp=rich().pivots||{}, piv=[...(pp.recent||[]).slice(-3),...(pp.next||[]).slice(0,6)];
+    piv.forEach(p=>{const tt=Date.parse(p.pivot_utc);if(!Number.isFinite(tt)||tt<tMin||tt>tMax)return;const xx=xTime(tt);ctx.save();ctx.strokeStyle='rgba(85,85,85,.58)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ph);ctx.stroke();ctx.restore();});
   }
 
   // Asset-appropriate fractal envelope behind levels/labels. BTC is Source-aware; ETH/XRP are technical analogue until asset-specific Source reconstruction is validated.
@@ -230,7 +251,7 @@ function drawChart(){
   series.forEach(c=>{const xx=xTime(c.t),up=c.c>=c.o,col=up?'#15985a':'#d84a4a';ctx.strokeStyle=col;ctx.fillStyle=col;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(xx,y(c.h));ctx.lineTo(xx,y(c.l));ctx.stroke();const top=y(Math.max(c.o,c.c)),bot=y(Math.min(c.o,c.c));ctx.fillRect(xx-bw/2,top,bw,Math.max(1,bot-top));});
 
   // Horizontal levels: lines stay in the plot; text is placed in dedicated gutters.
-  levels.forEach(l=>{const yy=y(l.value);ctx.save();ctx.strokeStyle=l.color;ctx.lineWidth=1.1;ctx.setLineDash(l.dash||[]);ctx.beginPath();ctx.moveTo(plotLeft,yy);ctx.lineTo(plotRight,yy);ctx.stroke();ctx.restore();});
+  levels.forEach(l=>{const yy=y(l.value);ctx.save();ctx.strokeStyle=l.color;ctx.globalAlpha=l.alpha??1;ctx.lineWidth=l.confirmed?1.5:1.1;ctx.setLineDash(l.dash||[]);ctx.beginPath();ctx.moveTo(plotLeft,yy);ctx.lineTo(plotRight,yy);ctx.stroke();ctx.restore();});
 
   const profileLabels=levels.filter(l=>l.kind==='profile');
   const tacLabels=levels.filter(l=>l.kind==='tac');

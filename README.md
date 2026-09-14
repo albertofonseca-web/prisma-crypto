@@ -1,72 +1,46 @@
-## v0.3.2 — ETH/XRP TA + fractal parity
+# PRISMA Crypto Cloud v0.3.3 — Fork Display Parity
 
-- ETH/XRP tactical charts now render published market-structure profiles instead of blank TA maps.
-- Full 24h/3d/MTD parity is supplied by multi-asset engine V3 via context_profiles.
-- ETH/XRP fractal is an asset-specific causal technical analogue trajectory (15m steps, median + Q20/Q80), explicitly NOT BTC Source reuse.
-- BTC Source-aware fractal and BTC logic remain unchanged.
-- Frontend supports publisher v3 contract `PRISMA_CRYPTO_RICH_V2_PARITY`.
+This release closes the remaining display gaps between the live fork outputs and the web terminal.
 
-## v0.3.1 — Chart rules fix
+## Fixed in v0.3.3
 
-- Market structure labels (POC/VWAP/TWAP/VAH/VAL) stay on the **left**.
-- TAC LONG/SHORT Entry/SL/TP1-TP3 labels move to a dedicated **right** gutter with collision spacing.
-- TAC pivot verticals are dotted, subtle, behind price, and carry no rotated text.
-- Horizontal level lines remain in the plot while labels live outside the candle field on desktop.
+- BTC, ETH and XRP all receive a pivot timeline in the web payload.
+- ETH/XRP use the shared TAC/Source pivot calendar **for display only**; it has no scoring or execution effect.
+- The chart draws the latest 3 pivots plus future pivots vertically behind price.
+- ETH/XRP fractal trajectory is read directly from each asset's `fractal/latest.json`, so the web does not depend on a reduced signal serializer.
+- ETH/XRP fractals remain asset-specific technical analogues; no BTC Source trajectory is reused.
+- Original fork geometry colors are restored:
+  - LONG Entry yellow `#ffd400`
+  - LONG SL dark red `#a61b1b`
+  - LONG TP dark green `#1b8f3a`
+  - SHORT Entry orange `#ffb347`
+  - SHORT SL light red `#ff6b6b`
+  - SHORT TP light green `#7cfc98`
+- Confirmed candidate entries are visibly marked and use heavier lines.
+- POC/VWAP/TWAP/VAH/VAL remain on the left; Entry/SL/TP stay on the right.
+- The chart now exposes a fail-visible parity badge instead of silently omitting missing data.
 
-# PRISMA Crypto Cloud v0.3 — Rich Decision Terminal
+See `docs/FORK_PARITY_AUDIT.md` for the complete parity checklist.
 
-v0.3 convierte la prueba de conectividad v0.2 en una terminal de decisión útil. La infraestructura D1 se conserva; el cambio principal está en el contrato de datos y el frontend.
+## Cloud contract
 
-## Qué muestra
+Expected after the new Colab runner is active:
 
-- BTC / ETH / XRP con precio y velas Bitstamp directas al navegador.
-- `EXECUTION` desde posición cero: LONG / SHORT / WAIT.
-- `DIRECTIONAL BIAS` separado de la autorización de entrada.
-- TAC Tactical + HTF Gate 1H/4H.
-- Geometría bilateral LONG y SHORT: Entry, SL, TP1, TP2, TP3.
-- Niveles POC / VWAP / TWAP / VAH / VAL.
-- Próximos pivotes y ventanas Source para BTC.
-- Trayectoria Source-aware BTC con mediana y banda Q20–Q80.
-- Proyección 12H orientativa BTC, claramente marcada como no validada.
-- PRISMA Swing en módulo independiente, sin fusionar matemáticamente motores.
-- Opciones Deribit watch/selected, funding, liquidations y system health.
+- `publisher_version: 4.0.0_FORK_DISPLAY_PARITY`
+- `terminal_contract: PRISMA_CRYPTO_RICH_V3_FORK_PARITY`
 
-## Cambio de publisher
+## Cloudflare deployment
 
-La UI rica requiere estos archivos en:
+Replace the contents of the existing `prisma-crypto` repository with this package and commit. Do not create a new Worker.
 
-`/content/drive/MyDrive/tac/forks/source_reconstruction/`
+Validate:
 
-- `TAC_CLOUDFLARE_PAYLOAD_V2.py`
-- `TAC_D1_PUBLISHER_V2.py`
-- `SOURCE_FORK_MULTI_ASSET_V5_7_D1_RICH.py`
-- `SOURCE_FORK_MULTI_ASSET_V5_8_D1_RICH_EMBEDDED.py` (bootstrap privado con credenciales, si se usa)
+- `/api/health` -> `worker_version: "0.3.3"`
+- `/api/state` -> `publisher_version: "4.0.0_FORK_DISPLAY_PARITY"`
 
-El contrato mantiene `schema_version: 1.0` para compatibilidad con D1, pero añade:
+## Colab runtime
 
-- `publisher_version: 2.0.0_RICH_TERMINAL`
-- `terminal_contract: PRISMA_CRYPTO_RICH_V1`
-- `assets.BTC.rich.dynamic_now`
-- `assets.BTC.rich.projection_12h`
-- `assets.BTC.rich.context_profiles`
-- `assets.BTC.rich.pivots`
-- `assets.BTC.rich.fractal`
-- `assets.<ASSET>.rich.htf_detail`
-
-No cambia TAC, HTF, opciones ni reglas de trading. No habilita órdenes.
-
-## Deployment Cloudflare
-
-Reemplaza el contenido del repo `prisma-crypto` por el contenido de este paquete y haz commit. Cloudflare debe desplegar el mismo Worker.
-
-Validación:
-
-- `/api/health` debe reportar `worker_version: "0.3.1"`.
-- `/api/state` debe reportar `publisher_version: "2.0.0_RICH_TERMINAL"` después de reiniciar Colab con V5.8.
-
-## Colab
-
-Después de colocar los cuatro archivos anteriores en Drive, reinicia completamente el runtime y ejecuta sólo:
+The production-side companion files are stored separately in the private Drive folder: `MULTI_ASSET_SHADOW_ENGINE_V4_FORK_PARITY.py`, `TAC_CLOUDFLARE_PAYLOAD_V4_1_FORK_PARITY.py`, `TAC_D1_PUBLISHER_V4_1_FORK_PARITY.py`, `SOURCE_FORK_MULTI_ASSET_V5_13_D1_FORK_PARITY.py`, and the embedded bootstrap below. Restart the runtime completely and run only:
 
 ```python
 from google.colab import drive
@@ -74,19 +48,17 @@ drive.mount('/content/drive')
 
 exec(open(
     '/content/drive/MyDrive/tac/forks/source_reconstruction/'
-    'SOURCE_FORK_MULTI_ASSET_V5_8_D1_RICH_EMBEDDED.py',
+    'SOURCE_FORK_MULTI_ASSET_V5_14_D1_FORK_PARITY_EMBEDDED.py',
     encoding='utf-8'
 ).read())
 ```
 
-Debe aparecer:
+Expected markers:
 
 ```text
-INDEPENDENT SOURCE FORK V5.7
-[PRISMA D1 V2] latest OK ... RICH
-[PRISMA D1 V2] publisher ON ...
+PRISMA CRYPTO V5.14
+INDEPENDENT SOURCE FORK V5.13
+[PRISMA D1 V4] ... FORK DISPLAY PARITY
 ```
 
-## Seguridad
-
-El bootstrap V5.8 conserva el método que el usuario autorizó previamente: credenciales incrustadas en un archivo privado de Drive. Ese archivo no debe subirse a GitHub.
+Orders remain disabled. BTC trading/TAC/Source logic is unchanged. ETH/XRP remain shadow.
