@@ -49,7 +49,7 @@ async function loadSwing(){
 }
 
 async function loadState(){
-  try{ const r=await fetch(`/api/state?ts=${Date.now()}`,{cache:'no-store'}); const b=await r.json(); if(!r.ok||b.status!=='ok')throw new Error(b.message||`HTTP ${r.status}`); engineState=b.data; $('engine-dot').className='dot ok'; $('engine-health').textContent=`D1 ${engineState?.publisher_version?.startsWith('2.')?'rich':'live'}`; }
+  try{ const r=await fetch(`/api/state?ts=${Date.now()}`,{cache:'no-store'}); const b=await r.json(); if(!r.ok||b.status!=='ok')throw new Error(b.message||`HTTP ${r.status}`); engineState=b.data; $('engine-dot').className='dot ok'; $('engine-health').textContent=`D1 ${/^[23]\./.test(engineState?.publisher_version||'')?'rich':'live'}`; }
   catch(e){ $('engine-dot').className='dot err'; $('engine-health').textContent='D1 error'; console.error(e); }
   renderAll();
 }
@@ -134,13 +134,24 @@ function renderSwing(){
 }
 
 function renderSystem(){
-  const sys=engineState?.system||{}; const f=(label,o)=>metric(label,o?.status?`${o.status} · ${o.age_seconds??'—'}s`:'—',o?.status==='OK'&&(o.age_seconds??9999)<360?'pos':'warn'); $('engine-age').textContent=engineState?.generated_utc?ageText(engineState.generated_utc):'—'; $('system-panel').innerHTML=metric('Publisher',engineState?.publisher_version||'—',String(engineState?.publisher_version||'').startsWith('2.')?'pos':'warn')+metric('State hash',engineState?.state_hash||'—')+f('Decision',sys.decision_file)+f('Screener',sys.screener_file)+f('Options',sys.options_file)+metric('Orders',engineState?.orders_enabled?'ENABLED':'DISABLED',engineState?.orders_enabled?'neg':'pos');
+  const sys=engineState?.system||{}; const f=(label,o)=>metric(label,o?.status?`${o.status} · ${o.age_seconds??'—'}s`:'—',o?.status==='OK'&&(o.age_seconds??9999)<360?'pos':'warn'); $('engine-age').textContent=engineState?.generated_utc?ageText(engineState.generated_utc):'—'; $('system-panel').innerHTML=metric('Publisher',engineState?.publisher_version||'—',/^[23]\./.test(String(engineState?.publisher_version||''))?'pos':'warn')+metric('State hash',engineState?.state_hash||'—')+f('Decision',sys.decision_file)+f('Screener',sys.screener_file)+f('Options',sys.options_file)+metric('Orders',engineState?.orders_enabled?'ENABLED':'DISABLED',engineState?.orders_enabled?'neg':'pos');
 }
 
 function renderAll(){ updatePriceStrip(); const a=astate(); if(!a){$('execution-state').textContent='WAIT';$('execution-note').textContent='Esperando snapshot D1.';drawChart();return;} renderExecution();renderProjection();renderPivot();renderHTF();renderLevels();renderPivots();renderOptions();renderInternals();renderSwing();renderSystem();drawChart(); }
 
 function profileLevels(){
-  const p=rich().context_profiles||{}; const out=[]; const colors={POC:'#9a63c8',VWAP:'#e38b00',TWAP:'#4f7db7',VAH:'#198aa5',VAL:'#198aa5'}; for(const key of ['24h','3d','MTD']){const x=p[key];if(!x)continue;for(const n of ['POC','VWAP','TWAP','VAH','VAL'])if(Number.isFinite(+x[n]))out.push({value:+x[n],label:`${key} ${n}`,color:colors[n],dash:n==='VAH'||n==='VAL'?[2,4]:[4,3],kind:'profile'});} return out;
+  const r=rich(), p=r.context_profiles||{}; const out=[]; const colors={POC:'#9a63c8',VWAP:'#e38b00',TWAP:'#4f7db7',VAH:'#198aa5',VAL:'#198aa5'};
+  let keys=['24h','3d','MTD'].filter(k=>p[k]&&Object.keys(p[k]).length);
+  // ETH/XRP safety fallback: while full 24h/3d/MTD parity is warming up, plot
+  // their already-published asset-specific HTF profiles instead of showing a blank map.
+  let source=p;
+  if(!keys.length){
+    const h=r.htf_detail||{}; source={};
+    for(const tf of ['1H','4H']){const hp=h[tf]?.profile||{}; if(Object.keys(hp).length) source[tf]={POC:hp.POC??hp.poc,VWAP:hp.VWAP??hp.vwap,TWAP:hp.TWAP??hp.twap,VAH:hp.VAH??hp.vah,VAL:hp.VAL??hp.val};}
+    keys=['1H','4H'].filter(k=>source[k]&&Object.keys(source[k]).length);
+  }
+  for(const key of keys){const x=source[key];if(!x)continue;for(const n of ['POC','VWAP','TWAP','VAH','VAL']){const v=x[n]??x[n.toLowerCase()];if(Number.isFinite(+v))out.push({value:+v,label:`${key} ${n}`,color:colors[n],dash:n==='VAH'||n==='VAL'?[2,4]:[4,3],kind:'profile'});}}
+  return out;
 }
 function tacticalLevels(){ const G=geometry(), out=[]; for(const [side,col] of [['LONG','#15985a'],['SHORT','#d84a4a']]){const g=G[side]||{}; for(const [k,lbl,dash] of [['entry',`${side} E`,[]],['sl',`${side} SL`,[5,4]],['tp1',`${side} TP1`,[4,3]],['tp2',`${side} TP2`,[2,4]],['tp3',`${side} TP3`,[2,4]]])if(Number.isFinite(+g[k]))out.push({value:+g[k],label:lbl,color:col,dash,kind:'tac'});} return out; }
 function swingLevels(){ const p=swingState?.plan;if(!p)return[];return[{value:p.entry,label:'SW ENTRY',color:'#e38b00',dash:[]},{value:p.sl,label:'SW SL',color:'#d84a4a',dash:[]},{value:p.tp1,label:'SW TP1',color:'#e38b00',dash:[4,3]},{value:p.tp2,label:'SW TP2',color:'#e38b00',dash:[2,4]}].filter(x=>Number.isFinite(+x.value)); }
@@ -184,7 +195,7 @@ function drawChart(){
   let levels=chartMode==='TACTICAL'?[...tacticalLevels(),...profileLevels()]:swingLevels();
   if(chartMode==='TACTICAL'&&Number.isFinite(px))levels=levels.filter(x=>Math.abs(x.value/px-1)<.08);
 
-  const tr=rich().fractal?.trajectory||{}; let times=tr.times_utc||[],med=tr.source_median||[],q20=tr.source_q20||[],q80=tr.source_q80||[];
+  const fr=rich().fractal||{}, tr=fr.trajectory||{}; let times=tr.times_utc||[],med=tr.median||tr.source_median||tr.technical_median||[],q20=tr.q20||tr.source_q20||tr.technical_q20||[],q80=tr.q80||tr.source_q80||tr.technical_q80||[];
   const maxN={'1m':8,'5m':24,'15m':48,'1h':96,'4h':96}[chartTf]||48; times=times.slice(0,maxN);med=med.slice(0,maxN);q20=q20.slice(0,maxN);q80=q80.slice(0,maxN);
   const tMin=series[0].t; let tMax=series.at(-1).t;
   if(chartMode==='TACTICAL'&&times.length){const ft=Date.parse(times.at(-1));if(Number.isFinite(ft))tMax=Math.max(tMax,ft);}
@@ -208,7 +219,7 @@ function drawChart(){
     piv.forEach(p=>{const tt=Date.parse(p.pivot_utc);if(!Number.isFinite(tt)||tt<tMin||tt>tMax)return;const xx=xTime(tt);ctx.save();ctx.strokeStyle='rgba(85,85,85,.55)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ph);ctx.stroke();ctx.restore();});
   }
 
-  // Fractal Source-aware envelope behind levels/labels.
+  // Asset-appropriate fractal envelope behind levels/labels. BTC is Source-aware; ETH/XRP are technical analogue until asset-specific Source reconstruction is validated.
   if(chartMode==='TACTICAL'&&times.length&&med.length){
     const pts=times.map((t,i)=>({t:Date.parse(t),m:+med[i],lo:+q20[i],hi:+q80[i]})).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.m));
     if(pts.length>1){ctx.save();ctx.fillStyle='rgba(25,138,165,.10)';ctx.beginPath();pts.forEach((p,i)=>{const xx=xTime(p.t),yy=y(Number.isFinite(p.hi)?p.hi:p.m);if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);});[...pts].reverse().forEach(p=>ctx.lineTo(xTime(p.t),y(Number.isFinite(p.lo)?p.lo:p.m)));ctx.closePath();ctx.fill();ctx.strokeStyle='#198aa5';ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();pts.forEach((p,i)=>{const xx=xTime(p.t),yy=y(p.m);if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);});ctx.stroke();ctx.restore();}

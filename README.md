@@ -1,3 +1,11 @@
+## v0.3.2 — ETH/XRP TA + fractal parity
+
+- ETH/XRP tactical charts now render published market-structure profiles instead of blank TA maps.
+- Full 24h/3d/MTD parity is supplied by multi-asset engine V3 via context_profiles.
+- ETH/XRP fractal is an asset-specific causal technical analogue trajectory (15m steps, median + Q20/Q80), explicitly NOT BTC Source reuse.
+- BTC Source-aware fractal and BTC logic remain unchanged.
+- Frontend supports publisher v3 contract `PRISMA_CRYPTO_RICH_V2_PARITY`.
+
 ## v0.3.1 — Chart rules fix
 
 - Market structure labels (POC/VWAP/TWAP/VAH/VAL) stay on the **left**.
