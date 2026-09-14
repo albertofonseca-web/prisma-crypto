@@ -4,129 +4,72 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>PRISMA Crypto</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <title>PRISMA Crypto Terminal</title>
+  <link rel="stylesheet" href="/styles.css?v=0.3.0" />
 </head>
 <body>
-  <header class="nav">
-    <div class="brand">
-      <div class="logo">PC</div>
-      <div>
-        <div class="brand-title">PRISMA CRYPTO</div>
-        <div class="brand-sub">SWING + TAC TACTICAL · BTC / ETH / XRP</div>
-      </div>
-    </div>
-    <div id="asset-tabs" class="asset-tabs">
-      <button data-asset="BTC" class="asset-btn sel">₿ BTC</button>
-      <button data-asset="ETH" class="asset-btn">Ξ ETH</button>
-      <button data-asset="XRP" class="asset-btn">✕ XRP</button>
-    </div>
-    <div class="nav-health">
-      <span id="market-dot" class="dot warn"></span><span id="market-health">Bitstamp conectando</span>
-      <span class="sep">·</span>
-      <span id="engine-dot" class="dot warn"></span><span id="engine-health">Motor esperando</span>
-    </div>
-  </header>
+<header class="nav">
+  <div class="brand"><div class="logo">PC</div><div><div class="brand-title">PRISMA CRYPTO</div><div class="brand-sub">LIVE DECISION TERMINAL · BTC / ETH / XRP</div></div></div>
+  <div class="asset-tabs">
+    <button data-asset="BTC" class="asset-btn sel">₿ BTC</button>
+    <button data-asset="ETH" class="asset-btn">Ξ ETH</button>
+    <button data-asset="XRP" class="asset-btn">✕ XRP</button>
+  </div>
+  <div class="nav-health"><span id="market-dot" class="dot warn"></span><span id="market-health">Bitstamp</span><span class="sep">·</span><span id="engine-dot" class="dot warn"></span><span id="engine-health">D1</span></div>
+</header>
 
-  <main class="shell">
-    <section class="asset-hero">
-      <div>
-        <div class="eyebrow"><span id="asset-name">BTC/USD</span> · <span id="price-source">BITSTAMP</span></div>
-        <div class="price-row"><span id="live-price">—</span><span id="live-change" class="change">—</span></div>
-        <div class="age-row">mercado <span id="market-age">—</span> · motor <span id="engine-age">—</span></div>
-      </div>
-      <div class="decision-hero">
-        <div class="eyebrow">DECISIÓN DESDE FLAT</div>
-        <div id="final-decision" class="decision wait">WAIT</div>
-        <div id="decision-reason" class="decision-reason">Esperando estado del fork.</div>
-      </div>
-    </section>
+<main class="shell">
+  <section class="hero">
+    <div class="hero-price"><div class="eyebrow"><span id="asset-name">BTC/USD</span> · BITSTAMP</div><div class="price-line"><span id="live-price">—</span><span id="live-change" class="change">—</span></div><div class="age-row">mercado <span id="market-age">—</span> · motor <span id="engine-age">—</span></div></div>
+    <div class="hero-decision"><div class="eyebrow">EXECUTION FROM FLAT</div><div id="final-decision" class="decision wait">WAIT</div><div id="decision-reason" class="decision-reason">Esperando motor.</div></div>
+  </section>
 
-    <section class="quad">
-      <article class="card state-card">
-        <div class="card-kicker">PRISMA SWING</div>
-        <div class="row-between"><div id="swing-state" class="big-state neutral">CARGANDO</div><select id="swing-tf"><option value="4h">4H</option><option value="1day" selected>1D</option><option value="1week">1W</option><option value="1month">1M</option></select></div>
-        <div id="swing-note" class="small">Mismo régimen + histéresis + Monte Carlo del motor PRISMA.</div>
-      </article>
-      <article class="card state-card">
-        <div class="card-kicker">TAC TACTICAL</div>
-        <div id="tactical-state" class="big-state neutral">WAIT</div>
-        <div id="tactical-note" class="small">Sin snapshot publicado.</div>
-      </article>
-      <article class="card state-card">
-        <div class="card-kicker">HTF GATE</div>
-        <div id="htf-state" class="big-state neutral">—</div>
-        <div id="htf-note" class="small">1H / 4H</div>
-      </article>
-      <article class="card state-card">
-        <div class="card-kicker">NEXT TAC / SOURCE</div>
-        <div id="pivot-state" class="big-state neutral">—</div>
-        <div id="pivot-note" class="small">—</div>
-      </article>
-    </section>
+  <section class="status-grid">
+    <article class="card state-card execution"><div class="card-kicker">EXECUTION</div><div id="execution-state" class="big-state neutral">WAIT</div><div id="execution-note" class="small">No abrir posición todavía.</div></article>
+    <article class="card state-card"><div class="card-kicker">DIRECTIONAL BIAS</div><div id="bias-state" class="big-state neutral">—</div><div id="bias-note" class="small">TAC / Source candidate</div></article>
+    <article class="card state-card"><div class="card-kicker">HTF GATE</div><div id="htf-state" class="big-state neutral">—</div><div id="htf-note" class="small">1H / 4H</div></article>
+    <article class="card state-card"><div class="card-kicker">NEXT TAC / SOURCE</div><div id="pivot-state" class="big-state neutral">—</div><div id="pivot-note" class="small">—</div></article>
+    <article class="card state-card"><div class="card-kicker">12H PROJECTION</div><div id="projection-state" class="big-state neutral">—</div><div id="projection-note" class="small">BTC orientativa</div></article>
+  </section>
 
-    <section class="content-grid">
-      <div class="left-stack">
-        <article class="card chart-card">
-          <div class="card-head">
-            <div>
-              <div class="card-kicker">LIVE MARKET</div>
-              <div class="card-title">Bitstamp · precio y velas directas al navegador</div>
-            </div>
-            <div id="chart-tfs" class="tf-row">
-              <button data-tf="1m" class="tf-btn sel">1m</button><button data-tf="5m" class="tf-btn">5m</button><button data-tf="15m" class="tf-btn">15m</button><button data-tf="1h" class="tf-btn">1H</button><button data-tf="4h" class="tf-btn">4H</button><button data-tf="1d" class="tf-btn">1D</button>
-            </div>
-          </div>
-          <div class="chart-wrap"><canvas id="chart" width="1400" height="560"></canvas></div>
-          <div class="legend"><span class="legend-dot live"></span> Bitstamp <span class="legend-line swing"></span> PRISMA Swing <span class="legend-line tac"></span> TAC Tactical</div>
-        </article>
-
-        <div class="two-col">
-          <article class="card">
-            <div class="card-kicker">PRISMA SWING PLAN</div>
-            <div id="swing-plan" class="metric-list"></div>
-          </article>
-          <article class="card">
-            <div class="card-kicker">TACTICAL PLAN</div>
-            <div id="tactical-plan" class="metric-list"></div>
-          </article>
+  <section class="terminal-grid">
+    <div class="main-stack">
+      <article class="card chart-card">
+        <div class="card-head">
+          <div><div class="card-kicker">TACTICAL MARKET MAP</div><div class="card-title">Bitstamp + TAC geometry + profiles + Source/Fractal</div></div>
+          <div class="controls"><div class="mode-row"><button data-mode="TACTICAL" class="mode-btn sel">Tactical</button><button data-mode="SWING" class="mode-btn">Swing</button></div><div class="tf-row"><button data-tf="1m" class="tf-btn">1m</button><button data-tf="5m" class="tf-btn">5m</button><button data-tf="15m" class="tf-btn sel">15m</button><button data-tf="1h" class="tf-btn">1H</button><button data-tf="4h" class="tf-btn">4H</button></div></div>
         </div>
+        <div class="chart-wrap"><canvas id="chart" width="1500" height="650"></canvas></div>
+        <div class="legend"><span class="legend-dot live"></span> Bitstamp <span class="legend-line long"></span> LONG geometry <span class="legend-line short"></span> SHORT geometry <span class="legend-line profile"></span> POC/VWAP/VA <span class="legend-line fractal"></span> Source median / band <span class="legend-line pivot"></span> pivots</div>
+      </article>
 
-        <div class="two-col">
-          <article class="card">
-            <div class="card-kicker">OPTIONS · DERIBIT</div>
-            <div id="options-panel" class="metric-list"></div>
-          </article>
-          <article class="card">
-            <div class="card-kicker">MARKET INTERNALS</div>
-            <div id="internals-panel" class="metric-list"></div>
-          </article>
-        </div>
-      </div>
+      <section class="panel-grid three">
+        <article class="card"><div class="card-kicker">LONG PLAN</div><div id="long-plan" class="metric-list"></div></article>
+        <article class="card"><div class="card-kicker">SHORT PLAN</div><div id="short-plan" class="metric-list"></div></article>
+        <article class="card"><div class="card-kicker">12H PROJECTION DETAIL</div><div id="projection-panel" class="metric-list"></div></article>
+      </section>
 
-      <aside class="right-stack">
-        <article class="card decision-card">
-          <div class="card-kicker">QUÉ HACER AHORA</div>
-          <div id="decision-detail" class="decision-detail"></div>
-        </article>
-        <article class="card">
-          <div class="card-kicker">ALIGNMENT</div>
-          <div id="alignment-panel" class="metric-list"></div>
-        </article>
-        <article class="card">
-          <div class="card-kicker">SYSTEM HEALTH</div>
-          <div id="system-panel" class="metric-list"></div>
-        </article>
-        <article class="card free-card">
-          <div class="card-kicker">FREE-TIER GUARD</div>
-          <div id="usage-panel" class="metric-list"></div>
-          <div class="tiny">Estos contadores pertenecen a PRISMA Crypto; no representan el consumo total de la cuenta Cloudflare.</div>
-        </article>
-      </aside>
-    </section>
-  </main>
+      <section class="panel-grid two">
+        <article class="card"><div class="card-kicker">HTF 1H / 4H</div><div id="htf-detail" class="htf-grid"></div></article>
+        <article class="card"><div class="card-kicker">KEY LEVELS</div><div id="levels-panel" class="levels-grid"></div></article>
+      </section>
 
-  <footer>PRISMA CRYPTO · SHADOW / DECISION SUPPORT · NO ORDERS · motor de mercado y motor táctico permanecen separados.</footer>
-  <script type="module" src="/app.js"></script>
+      <section class="panel-grid two">
+        <article class="card"><div class="card-kicker">SOURCE / PIVOTS</div><div id="pivots-panel"></div></article>
+        <article class="card"><div class="card-kicker">OPTIONS · DERIBIT</div><div id="options-panel" class="metric-list"></div></article>
+      </section>
+    </div>
+
+    <aside class="side-stack">
+      <article class="card decision-card"><div class="card-kicker">QUÉ HACER AHORA</div><div id="decision-detail"></div></article>
+      <article class="card"><div class="card-kicker">PRISMA SWING</div><div class="row-between"><div id="swing-state" class="big-state neutral">—</div><select id="swing-tf"><option value="4h">4H</option><option value="1day" selected>1D</option><option value="1week">1W</option><option value="1month">1M</option></select></div><div id="swing-note" class="small"></div><div id="swing-plan" class="metric-list"></div></article>
+      <article class="card"><div class="card-kicker">MARKET INTERNALS</div><div id="internals-panel" class="metric-list"></div></article>
+      <article class="card"><div class="card-kicker">SYSTEM HEALTH</div><div id="system-panel" class="metric-list"></div></article>
+      <article class="card"><div class="card-kicker">FREE-TIER GUARD</div><div id="usage-panel" class="metric-list"></div></article>
+    </aside>
+  </section>
+</main>
+<footer>PRISMA CRYPTO v0.3 · SHADOW / DECISION SUPPORT · NO ORDERS · Bitstamp market data · D1 state distribution.</footer>
+<script type="module" src="/app.js?v=0.3.0"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.3.0";
 const HUB_NAME = "global";
 const ASSETS = new Set(["BTC", "ETH", "XRP"]);
 const TF_MAP = {
