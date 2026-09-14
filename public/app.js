@@ -145,16 +145,106 @@ function profileLevels(){
 function tacticalLevels(){ const G=geometry(), out=[]; for(const [side,col] of [['LONG','#15985a'],['SHORT','#d84a4a']]){const g=G[side]||{}; for(const [k,lbl,dash] of [['entry',`${side} E`,[]],['sl',`${side} SL`,[5,4]],['tp1',`${side} TP1`,[4,3]],['tp2',`${side} TP2`,[2,4]],['tp3',`${side} TP3`,[2,4]]])if(Number.isFinite(+g[k]))out.push({value:+g[k],label:lbl,color:col,dash,kind:'tac'});} return out; }
 function swingLevels(){ const p=swingState?.plan;if(!p)return[];return[{value:p.entry,label:'SW ENTRY',color:'#e38b00',dash:[]},{value:p.sl,label:'SW SL',color:'#d84a4a',dash:[]},{value:p.tp1,label:'SW TP1',color:'#e38b00',dash:[4,3]},{value:p.tp2,label:'SW TP2',color:'#e38b00',dash:[2,4]}].filter(x=>Number.isFinite(+x.value)); }
 
+function distributeLabelYs(items, yFn, top, bottom, minGap=13){
+  const rows=items.map((item,i)=>({item,i,target:yFn(item.value),y:yFn(item.value)})).sort((a,b)=>a.target-b.target);
+  if(!rows.length)return rows;
+  rows[0].y=Math.max(top,rows[0].target);
+  for(let i=1;i<rows.length;i++)rows[i].y=Math.max(rows[i].target,rows[i-1].y+minGap);
+  const overflow=rows.at(-1).y-bottom;
+  if(overflow>0){
+    rows.forEach(r=>r.y-=overflow);
+    for(let i=rows.length-2;i>=0;i--)rows[i].y=Math.min(rows[i].y,rows[i+1].y-minGap);
+    const under=top-rows[0].y;
+    if(under>0)rows.forEach(r=>r.y+=under);
+  }
+  return rows;
+}
+
+function drawGutterLabel(ctx,text,x,y,color,align='left'){
+  ctx.save(); ctx.font='700 8px Space Mono'; ctx.textBaseline='middle'; ctx.textAlign=align;
+  const w=ctx.measureText(text).width, padX=3, h=11;
+  const left=align==='right'?x-w-padX:x-padX;
+  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fillRect(left,y-h/2,w+padX*2,h);
+  ctx.fillStyle=color; ctx.fillText(text,x,y); ctx.restore();
+}
+
 function drawChart(){
-  const canvas=$('chart'); if(!canvas)return; const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1,cssW=Math.max(340,rect.width||1100),cssH=Math.max(390,Math.min(640,cssW*.47)); canvas.style.height=`${cssH}px`;canvas.width=Math.round(cssW*dpr);canvas.height=Math.round(cssH*dpr);const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cssW,cssH);ctx.fillStyle='#fff';ctx.fillRect(0,0,cssW,cssH);if(!candles.length){ctx.fillStyle='#888';ctx.fillText('Cargando Bitstamp…',20,30);return;}
-  const pad={l:12,r:92,t:14,b:30}; const series=candles.slice(-220); const px=livePrice()||series.at(-1)?.c; let levels=chartMode==='TACTICAL'?[...tacticalLevels(),...profileLevels()]:swingLevels(); if(chartMode==='TACTICAL'&&Number.isFinite(px))levels=levels.filter(x=>Math.abs(x.value/px-1)<.08);
-  const tr=rich().fractal?.trajectory||{}; let times=tr.times_utc||[],med=tr.source_median||[],q20=tr.source_q20||[],q80=tr.source_q80||[]; const maxN={'1m':8,'5m':24,'15m':48,'1h':96,'4h':96}[chartTf]||48; times=times.slice(0,maxN);med=med.slice(0,maxN);q20=q20.slice(0,maxN);q80=q80.slice(0,maxN);
-  const tMin=series[0].t; let tMax=series.at(-1).t; if(chartMode==='TACTICAL'&&times.length){const ft=Date.parse(times.at(-1));if(Number.isFinite(ft))tMax=Math.max(tMax,ft);} const futureVals=chartMode==='TACTICAL'?[...med,...q20,...q80].filter(Number.isFinite):[]; let lo=Math.min(...series.map(c=>c.l),...levels.map(x=>x.value),...futureVals);let hi=Math.max(...series.map(c=>c.h),...levels.map(x=>x.value),...futureVals); if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=px*.98;hi=px*1.02;} const span=Math.max(hi-lo,Math.abs(hi)*.001);lo-=span*.06;hi+=span*.06;const pw=cssW-pad.l-pad.r,ph=cssH-pad.t-pad.b;const xTime=t=>pad.l+(t-tMin)/(tMax-tMin)*pw;const y=v=>pad.t+(hi-v)/(hi-lo)*ph;
-  ctx.strokeStyle='#eceeef';ctx.lineWidth=1;ctx.fillStyle='#8b8f95';ctx.font='9px Space Mono';for(let k=0;k<=5;k++){const yy=pad.t+ph*k/5,val=hi-(hi-lo)*k/5;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(cssW-pad.r,yy);ctx.stroke();ctx.fillText(fmtPrice(val),cssW-pad.r+7,yy+3);} const bw=Math.max(1,Math.min(7,pw/series.length*.62));series.forEach(c=>{const xx=xTime(c.t),up=c.c>=c.o,col=up?'#15985a':'#d84a4a';ctx.strokeStyle=col;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(xx,y(c.h));ctx.lineTo(xx,y(c.l));ctx.stroke();const top=y(Math.max(c.o,c.c)),bot=y(Math.min(c.o,c.c));ctx.fillRect(xx-bw/2,top,bw,Math.max(1,bot-top));});
-  levels.forEach(l=>{const yy=y(l.value);ctx.save();ctx.strokeStyle=l.color;ctx.lineWidth=1.15;ctx.setLineDash(l.dash||[]);ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(cssW-pad.r,yy);ctx.stroke();ctx.restore();ctx.fillStyle=l.color;ctx.font='700 8px Space Mono';ctx.fillText(`${l.label} ${fmtPrice(l.value)}`,pad.l+3,Math.max(10,yy-3));});
-  if(chartMode==='TACTICAL'&&times.length&&med.length){const pts=times.map((t,i)=>({t:Date.parse(t),m:+med[i],lo:+q20[i],hi:+q80[i]})).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.m)); if(pts.length>1){ctx.save();ctx.fillStyle='rgba(25,138,165,.10)';ctx.beginPath();pts.forEach((p,i)=>{const xx=xTime(p.t),yy=y(Number.isFinite(p.hi)?p.hi:p.m);if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);});[...pts].reverse().forEach(p=>ctx.lineTo(xTime(p.t),y(Number.isFinite(p.lo)?p.lo:p.m)));ctx.closePath();ctx.fill();ctx.strokeStyle='#198aa5';ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();pts.forEach((p,i)=>{const xx=xTime(p.t),yy=y(p.m);if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);});ctx.stroke();ctx.restore();}}
-  if(chartMode==='TACTICAL'){const piv=rich().pivots?.next||[];piv.forEach(p=>{const tt=Date.parse(p.pivot_utc);if(!Number.isFinite(tt)||tt<tMin||tt>tMax)return;const xx=xTime(tt);ctx.save();ctx.strokeStyle='#666';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ph);ctx.stroke();ctx.restore();ctx.save();ctx.translate(xx+3,pad.t+12);ctx.rotate(Math.PI/2);ctx.fillStyle='#666';ctx.font='700 8px Space Mono';ctx.fillText(p.tac_label||'PIVOT',0,0);ctx.restore();});}
-  const ticks=[tMin,tMin+(tMax-tMin)*.33,tMin+(tMax-tMin)*.66,tMax];ctx.fillStyle='#8b8f95';ctx.font='9px Space Mono';ticks.forEach(t=>{const d=new Date(t);ctx.fillText(d.toLocaleString('es-MX',{timeZone:'America/Monterrey',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}),xTime(t)-28,cssH-8);});
+  const canvas=$('chart'); if(!canvas)return;
+  const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1,cssW=Math.max(340,rect.width||1100),cssH=Math.max(390,Math.min(640,cssW*.47));
+  canvas.style.height=`${cssH}px`;canvas.width=Math.round(cssW*dpr);canvas.height=Math.round(cssH*dpr);
+  const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cssW,cssH);ctx.fillStyle='#fff';ctx.fillRect(0,0,cssW,cssH);
+  if(!candles.length){ctx.fillStyle='#888';ctx.fillText('Cargando Bitstamp…',20,30);return;}
+
+  // Desktop: dedicated left gutter for market/profile labels and right gutter for TAC Entry/SL/TP.
+  // Mobile: keep compact in-chart labels so the candle area never collapses.
+  const wide=cssW>=900;
+  const pad=wide?{l:132,r:190,t:14,b:30}:{l:10,r:72,t:14,b:30};
+  const plotLeft=pad.l, plotRight=cssW-pad.r;
+  const series=candles.slice(-220); const px=livePrice()||series.at(-1)?.c;
+  let levels=chartMode==='TACTICAL'?[...tacticalLevels(),...profileLevels()]:swingLevels();
+  if(chartMode==='TACTICAL'&&Number.isFinite(px))levels=levels.filter(x=>Math.abs(x.value/px-1)<.08);
+
+  const tr=rich().fractal?.trajectory||{}; let times=tr.times_utc||[],med=tr.source_median||[],q20=tr.source_q20||[],q80=tr.source_q80||[];
+  const maxN={'1m':8,'5m':24,'15m':48,'1h':96,'4h':96}[chartTf]||48; times=times.slice(0,maxN);med=med.slice(0,maxN);q20=q20.slice(0,maxN);q80=q80.slice(0,maxN);
+  const tMin=series[0].t; let tMax=series.at(-1).t;
+  if(chartMode==='TACTICAL'&&times.length){const ft=Date.parse(times.at(-1));if(Number.isFinite(ft))tMax=Math.max(tMax,ft);}
+  const futureVals=chartMode==='TACTICAL'?[...med,...q20,...q80].filter(Number.isFinite):[];
+  let lo=Math.min(...series.map(c=>c.l),...levels.map(x=>x.value),...futureVals); let hi=Math.max(...series.map(c=>c.h),...levels.map(x=>x.value),...futureVals);
+  if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=px*.98;hi=px*1.02;}
+  const span=Math.max(hi-lo,Math.abs(hi)*.001);lo-=span*.06;hi+=span*.06;
+  const pw=plotRight-plotLeft, ph=cssH-pad.t-pad.b;
+  const xTime=t=>plotLeft+(t-tMin)/(tMax-tMin)*pw; const y=v=>pad.t+(hi-v)/(hi-lo)*ph;
+
+  // Grid and price axis.
+  ctx.strokeStyle='#eceeef';ctx.lineWidth=1;ctx.fillStyle='#8b8f95';ctx.font='9px Space Mono';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  for(let k=0;k<=5;k++){
+    const yy=pad.t+ph*k/5,val=hi-(hi-lo)*k/5;ctx.beginPath();ctx.moveTo(plotLeft,yy);ctx.lineTo(plotRight,yy);ctx.stroke();
+    ctx.fillText(fmtPrice(val),wide?cssW-64:plotRight+7,yy+3);
+  }
+
+  // TAC pivots are intentionally subtle, dotted and BEHIND price. No text on the chart.
+  if(chartMode==='TACTICAL'){
+    const piv=rich().pivots?.next||[];
+    piv.forEach(p=>{const tt=Date.parse(p.pivot_utc);if(!Number.isFinite(tt)||tt<tMin||tt>tMax)return;const xx=xTime(tt);ctx.save();ctx.strokeStyle='rgba(85,85,85,.55)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ph);ctx.stroke();ctx.restore();});
+  }
+
+  // Fractal Source-aware envelope behind levels/labels.
+  if(chartMode==='TACTICAL'&&times.length&&med.length){
+    const pts=times.map((t,i)=>({t:Date.parse(t),m:+med[i],lo:+q20[i],hi:+q80[i]})).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.m));
+    if(pts.length>1){ctx.save();ctx.fillStyle='rgba(25,138,165,.10)';ctx.beginPath();pts.forEach((p,i)=>{const xx=xTime(p.t),yy=y(Number.isFinite(p.hi)?p.hi:p.m);if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);});[...pts].reverse().forEach(p=>ctx.lineTo(xTime(p.t),y(Number.isFinite(p.lo)?p.lo:p.m)));ctx.closePath();ctx.fill();ctx.strokeStyle='#198aa5';ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();pts.forEach((p,i)=>{const xx=xTime(p.t),yy=y(p.m);if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);});ctx.stroke();ctx.restore();}
+  }
+
+  // Candles.
+  const bw=Math.max(1,Math.min(7,pw/series.length*.62));
+  series.forEach(c=>{const xx=xTime(c.t),up=c.c>=c.o,col=up?'#15985a':'#d84a4a';ctx.strokeStyle=col;ctx.fillStyle=col;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(xx,y(c.h));ctx.lineTo(xx,y(c.l));ctx.stroke();const top=y(Math.max(c.o,c.c)),bot=y(Math.min(c.o,c.c));ctx.fillRect(xx-bw/2,top,bw,Math.max(1,bot-top));});
+
+  // Horizontal levels: lines stay in the plot; text is placed in dedicated gutters.
+  levels.forEach(l=>{const yy=y(l.value);ctx.save();ctx.strokeStyle=l.color;ctx.lineWidth=1.1;ctx.setLineDash(l.dash||[]);ctx.beginPath();ctx.moveTo(plotLeft,yy);ctx.lineTo(plotRight,yy);ctx.stroke();ctx.restore();});
+
+  const profileLabels=levels.filter(l=>l.kind==='profile');
+  const tacLabels=levels.filter(l=>l.kind==='tac');
+  const swingLabels=levels.filter(l=>l.kind!=='profile'&&l.kind!=='tac');
+  const minY=pad.t+7,maxY=pad.t+ph-7;
+
+  // LEFT = POC / VWAP / TWAP / VAH / VAL and other market structure.
+  const leftRows=distributeLabelYs(profileLabels,y,minY,maxY,12);
+  leftRows.forEach(r=>{
+    const target=y(r.item.value), text=`${r.item.label} ${fmtPrice(r.item.value)}`;
+    if(wide){ctx.save();ctx.strokeStyle=r.item.color;ctx.globalAlpha=.55;ctx.beginPath();ctx.moveTo(plotLeft-5,target);ctx.lineTo(plotLeft-2,r.y);ctx.stroke();ctx.restore();drawGutterLabel(ctx,text,4,r.y,r.item.color,'left');}
+    else drawGutterLabel(ctx,text,plotLeft+3,r.y,r.item.color,'left');
+  });
+
+  // RIGHT = LONG/SHORT Entry, SL and TP1-TP3. Collision-managed, never stacked on the left.
+  const rightItems=chartMode==='TACTICAL'?tacLabels:swingLabels;
+  const rightRows=distributeLabelYs(rightItems,y,minY,maxY,13);
+  rightRows.forEach(r=>{
+    const target=y(r.item.value), text=`${r.item.label} ${fmtPrice(r.item.value)}`;
+    if(wide){ctx.save();ctx.strokeStyle=r.item.color;ctx.globalAlpha=.6;ctx.beginPath();ctx.moveTo(plotRight+2,target);ctx.lineTo(plotRight+6,r.y);ctx.stroke();ctx.restore();drawGutterLabel(ctx,text,plotRight+10,r.y,r.item.color,'left');}
+    else drawGutterLabel(ctx,text,plotRight-3,r.y,r.item.color,'right');
+  });
+
+  const ticks=[tMin,tMin+(tMax-tMin)*.33,tMin+(tMax-tMin)*.66,tMax];ctx.fillStyle='#8b8f95';ctx.font='9px Space Mono';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ticks.forEach(t=>{const d=new Date(t);ctx.fillText(d.toLocaleString('es-MX',{timeZone:'America/Monterrey',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}),xTime(t)-28,cssH-8);});
 }
 
 function selectAsset(x){asset=x;document.querySelectorAll('.asset-btn').forEach(b=>b.classList.toggle('sel',b.dataset.asset===asset));live.connect(asset);loadChart();loadSwing();renderAll();}

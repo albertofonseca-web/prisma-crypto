@@ -1,3 +1,10 @@
+## v0.3.1 — Chart rules fix
+
+- Market structure labels (POC/VWAP/TWAP/VAH/VAL) stay on the **left**.
+- TAC LONG/SHORT Entry/SL/TP1-TP3 labels move to a dedicated **right** gutter with collision spacing.
+- TAC pivot verticals are dotted, subtle, behind price, and carry no rotated text.
+- Horizontal level lines remain in the plot while labels live outside the candle field on desktop.
+
 # PRISMA Crypto Cloud v0.3 — Rich Decision Terminal
 
 v0.3 convierte la prueba de conectividad v0.2 en una terminal de decisión útil. La infraestructura D1 se conserva; el cambio principal está en el contrato de datos y el frontend.
@@ -46,7 +53,7 @@ Reemplaza el contenido del repo `prisma-crypto` por el contenido de este paquete
 
 Validación:
 
-- `/api/health` debe reportar `worker_version: "0.3.0"`.
+- `/api/health` debe reportar `worker_version: "0.3.1"`.
 - `/api/state` debe reportar `publisher_version: "2.0.0_RICH_TERMINAL"` después de reiniciar Colab con V5.8.
 
 ## Colab
