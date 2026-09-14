@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
   <title>PRISMA Crypto Terminal</title>
-  <link rel="stylesheet" href="/styles.css?v=0.3.3" />
+  <link rel="stylesheet" href="/styles.css?v=0.3.5" />
 </head>
 <body>
 <header class="nav">
@@ -36,11 +36,24 @@
     <div class="main-stack">
       <article class="card chart-card">
         <div class="card-head">
-          <div><div class="card-kicker">TACTICAL MARKET MAP</div><div class="card-title">Bitstamp + TAC geometry + profiles + Source/Fractal <span id="chart-coverage" class="badge warn">CHECKING</span></div></div>
-          <div class="controls"><div class="mode-row"><button data-mode="TACTICAL" class="mode-btn sel">Tactical</button><button data-mode="SWING" class="mode-btn">Swing</button></div><div class="tf-row"><button data-tf="1m" class="tf-btn">1m</button><button data-tf="5m" class="tf-btn">5m</button><button data-tf="15m" class="tf-btn sel">15m</button><button data-tf="1h" class="tf-btn">1H</button><button data-tf="4h" class="tf-btn">4H</button></div></div>
+          <div><div id="chart-kicker" class="card-kicker">TACTICAL MARKET MAP</div><div id="chart-title" class="card-title">Bitstamp + TAC geometry + profiles + Source/Fractal <span id="chart-coverage" class="badge warn">CHECKING</span></div></div>
+          <div class="controls">
+            <div class="mode-row"><button data-mode="TACTICAL" class="mode-btn sel">Tactical</button><button data-mode="SWING" class="mode-btn">Swing</button></div>
+            <div id="tactical-tf-row" class="tf-row"><button data-tf="1m" class="tf-btn">1m</button><button data-tf="5m" class="tf-btn">5m</button><button data-tf="15m" class="tf-btn sel">15m</button><button data-tf="1h" class="tf-btn">1H</button><button data-tf="4h" class="tf-btn">4H</button></div>
+            <div id="swing-tf-row" class="tf-row hidden"><button data-swing-tf="4h" class="swing-tf-btn">4H</button><button data-swing-tf="1day" class="swing-tf-btn sel">1D</button><button data-swing-tf="1week" class="swing-tf-btn">1W</button><button data-swing-tf="1month" class="swing-tf-btn">1M</button></div>
+          </div>
+        </div>
+        <div class="chart-toolbar" aria-label="Chart overlays">
+          <button class="tool-btn sel" data-overlay="plan" title="Mostrar/ocultar geometría TAC o plan Swing">📐 Futuros</button>
+          <button class="tool-btn" data-overlay="options" title="Deribit: Call Wall, Put Wall, strikes y breakeven de la idea de opciones">🎯 Opciones</button>
+          <button class="tool-btn ghost" id="no-plan-btn" title="Oculta plan y opciones; deja sólo mercado y overlays elegidos">Sin plan</button>
+          <button class="tool-btn sel" data-overlay="levels" title="POC, VAH, VAL, VWAP y TWAP">🎯 Niveles</button>
+          <button class="tool-btn" data-overlay="liq" title="Liquidaciones REALIZADAS del monitor TAC; no es heatmap futuro">🧲 Liq</button>
+          <button class="tool-btn" data-overlay="medias" title="EMA 9/21/50 del contexto 1H">📉 Medias</button>
+          <button class="tool-btn ghost" id="fullscreen-btn">⛶ Pantalla completa</button>
         </div>
         <div class="chart-wrap"><canvas id="chart" width="1500" height="650"></canvas></div>
-        <div class="legend"><span class="legend-dot live"></span> Bitstamp <span class="legend-line long"></span> LONG geometry <span class="legend-line short"></span> SHORT geometry <span class="legend-line profile"></span> POC/VWAP/VA <span class="legend-line fractal"></span> <span id="fractal-legend">Fractal median / Q20–Q80</span> <span class="legend-line pivot"></span> pivots</div>
+        <div class="legend"><span class="legend-dot live"></span> Bitstamp <span class="legend-line long"></span> LONG geometry <span class="legend-line short"></span> SHORT geometry <span class="legend-line profile"></span> POC/VWAP/VA <span class="legend-line fractal"></span> <span id="fractal-legend">Fractal median / Q20–Q80</span> <span class="legend-line pivot"></span> pivots <span class="legend-line callwall"></span> Call Wall <span class="legend-line putwall"></span> Put Wall <span class="legend-line liqreal"></span> realized liq</div>
       </article>
 
       <section class="panel-grid three">
@@ -56,12 +69,12 @@
 
       <section class="panel-grid two">
         <article class="card"><div class="card-kicker">SOURCE / PIVOTS</div><div id="pivots-panel"></div></article>
-        <article class="card"><div class="card-kicker">OPTIONS · DERIBIT</div><div id="options-panel" class="metric-list"></div></article>
+        <article class="card"><div class="card-kicker">OPTIONS INTELLIGENCE · DERIBIT</div><div id="options-panel" class="metric-list"></div></article>
       </section>
     </div>
 
     <aside class="side-stack">
-      <article class="card decision-card"><div class="card-kicker">QUÉ HACER AHORA</div><div id="decision-detail"></div></article>
+      <article class="card decision-card"><div id="decision-kicker" class="card-kicker">QUÉ HACER AHORA</div><div id="decision-detail"></div></article>
       <article class="card"><div class="card-kicker">PRISMA SWING</div><div class="row-between"><div id="swing-state" class="big-state neutral">—</div><select id="swing-tf"><option value="4h">4H</option><option value="1day" selected>1D</option><option value="1week">1W</option><option value="1month">1M</option></select></div><div id="swing-note" class="small"></div><div id="swing-plan" class="metric-list"></div></article>
       <article class="card"><div class="card-kicker">MARKET INTERNALS</div><div id="internals-panel" class="metric-list"></div></article>
       <article class="card"><div class="card-kicker">SYSTEM HEALTH</div><div id="system-panel" class="metric-list"></div></article>
@@ -69,7 +82,7 @@
     </aside>
   </section>
 </main>
-<footer>PRISMA CRYPTO v0.3.3 · SHADOW / DECISION SUPPORT · NO ORDERS · Bitstamp market data · D1 state distribution.</footer>
-<script type="module" src="/app.js?v=0.3.3"></script>
+<footer>PRISMA CRYPTO v0.3.5 · SHADOW / DECISION SUPPORT · NO ORDERS · Bitstamp market data · D1 state distribution.</footer>
+<script type="module" src="/app.js?v=0.3.5"></script>
 </body>
 </html>

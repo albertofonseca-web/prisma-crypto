@@ -35,24 +35,24 @@ function zigzag(win, ZZ) {
       const chg = ((px - ePx) / ePx) * 100;
       if (Math.abs(chg) >= ZZ) {
         dir = chg > 0 ? 1 : -1;
-        piv.push({ i: eIdx, px: ePx, type: dir > 0 ? "L" : "H" });
+        piv.push({ i: eIdx, t: win[eIdx]?.t ?? null, px: ePx, type: dir > 0 ? "L" : "H" });
         eIdx = i; ePx = px;
       }
     } else if (dir === 1) {
       if (px > ePx) { ePx = px; eIdx = i; }
       else if (((ePx - px) / ePx) * 100 >= ZZ) {
-        piv.push({ i: eIdx, px: ePx, type: "H" });
+        piv.push({ i: eIdx, t: win[eIdx]?.t ?? null, px: ePx, type: "H" });
         dir = -1; eIdx = i; ePx = px;
       }
     } else {
       if (px < ePx) { ePx = px; eIdx = i; }
       else if (((px - ePx) / ePx) * 100 >= ZZ) {
-        piv.push({ i: eIdx, px: ePx, type: "L" });
+        piv.push({ i: eIdx, t: win[eIdx]?.t ?? null, px: ePx, type: "L" });
         dir = 1; eIdx = i; ePx = px;
       }
     }
   }
-  piv.push({ i: eIdx, px: ePx, type: dir === 1 ? "H" : "L", open: true });
+  piv.push({ i: eIdx, t: win[eIdx]?.t ?? null, px: ePx, type: dir === 1 ? "H" : "L", open: true });
   for (let j = 0; j < piv.length; j++) {
     const prev = [...piv.slice(0, j)].reverse().find(p => p.type === piv[j].type);
     piv[j].label = prev
@@ -263,6 +263,8 @@ export function computePrismaSwing(candlesInput, asset = "BTC", tf = "1day") {
       raw_regime: currentRaw,
       seal,
       plan: null,
+      pivots: piv.slice(-12),
+      fib,
       source_logic: "PRISMA motor_site_v4_17 · regime+hysteresis+MC"
     };
   }
@@ -277,6 +279,8 @@ export function computePrismaSwing(candlesInput, asset = "BTC", tf = "1day") {
     plan: rolled.plan,
     generation: rolled.gen,
     previous_resolution: rolled.res,
+    pivots: piv.slice(-12),
+    fib,
     source_logic: "PRISMA motor_site_v4_17 · regime+hysteresis+rolling-seal+MC"
   };
 }

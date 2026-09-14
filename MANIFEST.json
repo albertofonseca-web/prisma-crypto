@@ -1,7 +1,7 @@
 {
   "package": "PRISMA_CRYPTO_CLOUD",
-  "version": "0.3.3",
-  "generated_utc": "2026-09-14T05:53:09.548830+00:00",
+  "version": "0.3.5",
+  "generated_utc": "2026-09-14T06:25:00.862336+00:00",
   "files": [
     {
       "path": ".dev.vars.example",
@@ -15,8 +15,8 @@
     },
     {
       "path": "README.md",
-      "size_bytes": 2506,
-      "sha256": "5040ef0c953567d2e6311252163365122ae2df95053d2be54d21a3dbc66ff574"
+      "size_bytes": 4897,
+      "sha256": "879632bbaf73009bcf4492d4ab110a13abf2580911a4ee99e391324aef4b14fe"
     },
     {
       "path": "docs/ARCHITECTURE.md",
@@ -31,17 +31,17 @@
     {
       "path": "package.json",
       "size_bytes": 373,
-      "sha256": "0924de91c4d4cb6a8d5b8bdb17ea5b8b2b12065f38fc921230502a6d3bc3b6b1"
+      "sha256": "16bbd04b5a091d94356c2ea2ca36f3ba4d43954089e9cc2892d10855054fbd37"
     },
     {
       "path": "public/app.js",
-      "size_bytes": 28686,
-      "sha256": "0ad1073a25948ec8412cff83660366526d47573021d9fb13335305bc3bfebad5"
+      "size_bytes": 43565,
+      "sha256": "a67ebb2b94081d162c1261d2cd6722b4ffd7276c2a5f0161c928aa0b46ac6883"
     },
     {
       "path": "public/index.html",
-      "size_bytes": 6316,
-      "sha256": "c83aed03ede01b0bbded790833e2028319fee964ec0bc189c3a74bab40b5f04c"
+      "size_bytes": 7903,
+      "sha256": "cb6deb059ded04c6e3eac99af17368f3b80b4ec3a9e9208e1ac0b5b93e7f64cb"
     },
     {
       "path": "public/market.js",
@@ -50,13 +50,13 @@
     },
     {
       "path": "public/prisma-swing.js",
-      "size_bytes": 10058,
-      "sha256": "eeef611c2d243b0581585c6e747d9f290fce6191f0addd6b98600d4f8066d603"
+      "size_bytes": 10236,
+      "sha256": "6416bb621b9fdd0f4dc0cfc1c166793afe30bdbc50f49075e600292c3b146c28"
     },
     {
       "path": "public/styles.css",
-      "size_bytes": 7696,
-      "sha256": "9ba71eb606f3ba9f082c35631bfe89174318ce1ded68d5a53cfa1dfe2ed0a6c1"
+      "size_bytes": 10634,
+      "sha256": "e6b1124a91d268a5d696dbd9cf83c28c649783b65887f1a6b03d4f14e5aeb589"
     },
     {
       "path": "publisher/TAC_CLOUDFLARE_PAYLOAD_V2.py",
@@ -72,6 +72,11 @@
       "path": "publisher/TAC_CLOUDFLARE_PAYLOAD_V4_1_FORK_PARITY.py",
       "size_bytes": 15390,
       "sha256": "2fc83d3766d1f73ad1d932dfe42a321715ecad777621d1cf3ec88c653cca7c60"
+    },
+    {
+      "path": "publisher/TAC_CLOUDFLARE_PAYLOAD_V5_PRISMA_FEATURES.py",
+      "size_bytes": 22704,
+      "sha256": "c1a0e19761319218653af2ec474287133e18c0e3d965c1f0b09022ef285a2194"
     },
     {
       "path": "publisher/TAC_CLOUDFLARE_PUBLISHER_V1.py",
@@ -94,19 +99,29 @@
       "sha256": "a80512856a2912571d91c2046ffbf7e3e9a56723570c796c304d16314076851d"
     },
     {
+      "path": "publisher/TAC_D1_PUBLISHER_V5_PRISMA_FEATURES.py",
+      "size_bytes": 5424,
+      "sha256": "95fa7d3056418ced3fde816ff16ae0b39e930e716e75e884757bd4632d93f3c7"
+    },
+    {
+      "path": "publisher/__pycache__/TAC_CLOUDFLARE_PAYLOAD_V4_1_FORK_PARITY.cpython-313.pyc",
+      "size_bytes": 22880,
+      "sha256": "398bfcfd1c0ac584e32d50978a1de45eb06300ea9361bdd65856ead3d2f3a87b"
+    },
+    {
       "path": "schema/crypto_state.schema.json",
       "size_bytes": 1736,
       "sha256": "dddf65804f1ab4c64e79a66d1ee4b1ac439a7651aeec065e60295cc4cf30834c"
     },
     {
       "path": "src/index.js",
-      "size_bytes": 14353,
-      "sha256": "2c1c12a5d99fb375d35112bc9871393c2732ea28b6166e72479b7a566a9f48cd"
+      "size_bytes": 17014,
+      "sha256": "dd56ac57d102df4b939e682a138a588f09a076685c88ef4cca6c6eef93306699"
     },
     {
       "path": "tests/smoke-swing.mjs",
-      "size_bytes": 775,
-      "sha256": "a837ba12246406eb376e307540ccc0ae4b644f672fc4b978381ba25b7426cd79"
+      "size_bytes": 903,
+      "sha256": "f0f43a5f936ce78f39afa99d91baedf6671e0a34568701eb24f4693424bdcdff"
     },
     {
       "path": "tests/test-parity.py",

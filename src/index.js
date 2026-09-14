@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-const APP_VERSION = "0.3.3";
+const APP_VERSION = "0.3.5";
 const HUB_NAME = "global";
 const ASSETS = new Set(["BTC", "ETH", "XRP"]);
 const TF_MAP = {
@@ -163,14 +163,71 @@ async function krakenSeries(asset, tf) {
   return saneaVelas(rows);
 }
 
-async function prismaSeries(asset, tf) {
-  try {
-    const candles = await bybitSeries(asset, tf);
-    return { candles, source: "BYBIT_SPOT" };
-  } catch (bybitError) {
-    const candles = await krakenSeries(asset, tf);
-    return { candles, source: "KRAKEN_SPOT_FALLBACK", fallback_reason: String(bybitError.message || bybitError) };
+function bitstampSymbol(asset) {
+  return { BTC: "btcusd", ETH: "ethusd", XRP: "xrpusd" }[asset];
+}
+
+async function bitstampOhlcPage(asset, step, limit = 1000, end = null) {
+  const symbol = bitstampSymbol(asset);
+  if (!symbol) throw new Error(`Bitstamp symbol no configurado para ${asset}`);
+  const params = new URLSearchParams({ step: String(step), limit: String(limit) });
+  if (end) params.set("end", String(Math.floor(end / 1000)));
+  const upstream = `https://www.bitstamp.net/api/v2/ohlc/${symbol}/?${params.toString()}`;
+  const response = await fetch(upstream, { headers: { "user-agent": "PRISMA-Crypto/0.3.5" } });
+  if (!response.ok) throw new Error(`Bitstamp HTTP ${response.status}`);
+  const body = await response.json();
+  const rows = (body?.data?.ohlc || []).map(x => ({
+    t: +x.timestamp * 1000, o: +x.open, h: +x.high, l: +x.low, c: +x.close, v: +x.volume || 0
+  })).filter(x => Number.isFinite(x.c) && x.c > 0);
+  if (!rows.length) throw new Error("Bitstamp serie vacía");
+  return saneaVelas(rows);
+}
+
+function aggregateCandles(rows, mode) {
+  const buckets = new Map();
+  for (const x of rows) {
+    const d = new Date(x.t);
+    let key, t;
+    if (mode === "1week") {
+      const day = d.getUTCDay() || 7;
+      const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day + 1));
+      t = monday.getTime(); key = String(t);
+    } else if (mode === "1month") {
+      t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1); key = String(t);
+    } else throw new Error(`aggregate mode no soportado: ${mode}`);
+    const b = buckets.get(key);
+    if (!b) buckets.set(key, { t, o:x.o, h:x.h, l:x.l, c:x.c, v:x.v || 0 });
+    else { b.h = Math.max(b.h, x.h); b.l = Math.min(b.l, x.l); b.c = x.c; b.v += x.v || 0; }
   }
+  return [...buckets.values()].sort((a,b)=>a.t-b.t);
+}
+
+async function bitstampDailyHistory(asset, pages = 4) {
+  let all = [], end = null;
+  for (let i = 0; i < pages; i++) {
+    const page = await bitstampOhlcPage(asset, 86400, 1000, end);
+    all.push(...page);
+    const first = page[0]?.t;
+    if (!Number.isFinite(first) || page.length < 2) break;
+    end = first - 86400e3;
+  }
+  return saneaVelas(all);
+}
+
+async function prismaSeries(asset, tf) {
+  // PRISMA Crypto uses Bitstamp as the canonical market-price source.
+  // 4H/1D come directly from Bitstamp; 1W/1M are aggregated from Bitstamp daily OHLC.
+  if (tf === "4h") return { candles: await bitstampOhlcPage(asset, 14400, 1000), source: "BITSTAMP" };
+  if (tf === "1day") return { candles: await bitstampOhlcPage(asset, 86400, 1000), source: "BITSTAMP" };
+  if (tf === "1week") {
+    const daily = await bitstampDailyHistory(asset, 2);
+    return { candles: aggregateCandles(daily, "1week"), source: "BITSTAMP_AGG_WEEK" };
+  }
+  if (tf === "1month") {
+    const daily = await bitstampDailyHistory(asset, 4);
+    return { candles: aggregateCandles(daily, "1month"), source: "BITSTAMP_AGG_MONTH" };
+  }
+  throw new Error(`timeframe PRISMA Swing no soportado: ${tf}`);
 }
 
 

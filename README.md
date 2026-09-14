@@ -1,3 +1,36 @@
+# PRISMA Crypto Cloud v0.3.5 — Swing Workspace Fix
+
+## Fixed in v0.3.5
+
+- Swing is now a real workspace, not tactical candles with distant Swing lines superimposed.
+- Swing candles come from the selected Swing timeframe (4H / 1D / 1W / 1M).
+- PRISMA Swing market series use Bitstamp as the canonical source. 1W/1M are aggregated from Bitstamp daily OHLC.
+- The Swing viewport follows market structure and **does not expand to include distant TP/SL**. Out-of-range targets/stops are shown as edge arrows and remain fully visible in the right-side trade plan.
+- Swing chart adds PRISMA structural pivots (HH/LH/HL/LL) and Fibonacci context.
+- Swing mode uses a dedicated right-side `SWING · QUÉ HACER AHORA` panel with Entry, SL, TP1, TP2, distance %, model probabilities, R:R, regime, horizon, generation and source.
+- Tactical and Swing timeframe controls are now separate.
+- Swing moving averages are computed from the active Swing series rather than reusing tactical 1H EMA values.
+- Tactical/Fork logic, D1 contract, options, Call/Put Walls and liquidation overlays are unchanged.
+
+This release is Cloudflare/frontend only. If the v0.3.4/V5 publisher is already running in Colab, **do not restart Colab for this Swing fix**.
+
+# PRISMA Crypto Cloud v0.3.4 — PRISMA Feature Parity
+
+## Added in v0.3.4
+
+- Chart toolbar inspired by the existing PRISMA page: Futuros, Opciones, Sin plan, Niveles, Liq, Medias, Pantalla completa.
+- Deribit Call Wall / Put Wall from live option-chain open interest. Nearest-expiry walls are used on-chart; aggregate walls remain visible in the panel.
+- Options intelligence expands the existing fork screener: selected/watch strategy, legs, expiry, debit, max loss/profit, breakeven, PnL at TAC TP1/TP2/TP3/SL, spread, OI, volume and expiry wall ladder.
+- Realized liquidation-flow overlay from the TAC Binance/Deribit shadow collector. This is explicitly NOT a forward liquidation heatmap and has score weight 0.
+- The legacy PRISMA estimated Bybit-perp liquidation model is not silently recreated: its exact estimator code was not recovered in the current source set. The UI reports this honestly.
+- 1H EMA9/EMA21/EMA50 overlay under Medias.
+- All new overlays are display/context only and do not alter TAC/HTF/fork trading logic.
+
+## Cloud contract
+
+Publisher: `5.0.0_PRISMA_FEATURE_PARITY`  
+Terminal contract: `PRISMA_CRYPTO_RICH_V4_FEATURE_PARITY`
+
 # PRISMA Crypto Cloud v0.3.3 — Fork Display Parity
 
 This release closes the remaining display gaps between the live fork outputs and the web terminal.

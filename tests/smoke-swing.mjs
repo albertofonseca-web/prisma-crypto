@@ -13,6 +13,9 @@ const out=computePrismaSwing(candles,'BTC','1day');
 assert.equal(out.asset,'BTC');
 assert.equal(out.tf,'1day');
 assert.ok(['READY','NO_DIRECTIONAL_SETUP','NO_PLAN'].includes(out.status));
+assert.ok(Array.isArray(out.pivots));
+assert.ok(out.pivots.length > 0);
+assert.ok(out.pivots.some(x => Number.isFinite(+x.t)));
 if(out.plan){
   assert.ok(out.plan.entry>0);
   assert.ok(out.plan.sl>0);
