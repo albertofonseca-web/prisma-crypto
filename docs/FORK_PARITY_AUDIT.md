@@ -31,3 +31,12 @@ The chart header renders `FORK DATA COMPLETE` only when the selected asset has:
 3. published pivots.
 
 Otherwise it shows `MISSING TA`, `MISSING FRACTAL`, and/or `MISSING PIVOTS` instead of silently drawing an incomplete chart.
+
+## v0.3.8 full event display timeline
+
+The execution calendar and display calendar are intentionally different layers.
+`TAC_FULL_EVENT_DISPLAY_V1.csv` combines the historical TAC master, the 180-day
+classified Source reconstruction, and unclassified astronomical candidates.
+Candidates are always tagged `display_class=CANDIDATE` and `decision_effect=NONE`.
+They may be shown in the table and chart but never create or veto a trade.
+The UI no longer truncates the event table to six rows; it supports 24H / 48H / 7D views.

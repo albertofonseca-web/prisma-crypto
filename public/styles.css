@@ -35,3 +35,29 @@
 .mode-swing .decision-card{border-top-color:#4f7db7}
 .mode-swing .chart-card{border-top:3px solid #e38b00}
 @media(max-width:760px){.swing-tf-row{overflow-x:auto;flex-wrap:nowrap}.swing-tf-btn{flex:0 0 auto}}
+
+
+/* v0.3.7 · true EMA curves + explicit TAC/Fork options plan */
+.legend-line.ema9{border-color:#15985a}.legend-line.ema21{border-color:#6f74d8}.legend-line.ema50{border-color:#20a4b6}
+.tactical-options-card{border-top:3px solid #8357c5}
+.option-plan-callout{margin:8px 0 10px;padding:10px 11px;border:1px solid rgba(131,87,197,.20);border-radius:10px;background:#faf8ff}
+.option-plan-callout.selected{border-color:rgba(21,152,90,.28);background:#f5fcf8}
+.option-plan-status{font:700 18px 'Space Mono';margin-bottom:3px}.option-plan-sub{font-size:9px;color:var(--muted);line-height:1.45}
+.option-scenario-title{font:700 8px 'Space Mono';letter-spacing:.1em;color:#8357c5;margin:11px 0 3px;padding-top:8px;border-top:1px solid var(--hair)}
+.option-watch-alts{display:grid;gap:5px;margin-top:9px;padding-top:8px;border-top:1px solid var(--hair);font-size:9px;color:var(--muted)}
+.option-watch-alts>div{display:flex;justify-content:space-between;gap:8px}.option-watch-alts b{font-family:'Space Mono';color:var(--ink)}
+.mode-swing .tactical-options-card{opacity:.92;border-top-color:#8357c5}
+
+/* v0.3.8 · full TAC/Source display calendar. Candidates are visible context only. */
+.pivot-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+.pivot-filters{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.pivot-filter-btn{border:1px solid var(--hair);background:var(--surface2);color:var(--muted);padding:4px 7px;border-radius:7px;cursor:pointer;font:700 8px 'Space Mono'}
+.pivot-filter-btn.sel{border-color:var(--gold);background:#fff8ec;color:var(--gold)}
+.pivot-list.full{max-height:360px;overflow:auto;padding-right:4px}
+.pivot-row.candidate{opacity:.62}
+.pivot-row.classified{background:linear-gradient(90deg,rgba(227,139,0,.045),transparent)}
+.pivot-row .pivot-class{font:700 8px 'Space Mono';letter-spacing:.04em;color:var(--muted)}
+.pivot-row.candidate .pivot-label{color:#8b8f95!important}
+.pivot-summary{display:flex;gap:8px;flex-wrap:wrap;margin:7px 0 5px}
+.pivot-summary .window-chip{background:#fafafa}
+@media(max-width:760px){.pivot-card-head{flex-direction:column}.pivot-filters{justify-content:flex-start}.pivot-row{grid-template-columns:78px 82px 1fr}.pivot-row .pivot-class{display:none}}

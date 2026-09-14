@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
   <title>PRISMA Crypto Terminal</title>
-  <link rel="stylesheet" href="/styles.css?v=0.3.5" />
+  <link rel="stylesheet" href="/styles.css?v=0.3.8" />
 </head>
 <body>
 <header class="nav">
@@ -28,7 +28,7 @@
     <article class="card state-card execution"><div class="card-kicker">EXECUTION</div><div id="execution-state" class="big-state neutral">WAIT</div><div id="execution-note" class="small">No abrir posición todavía.</div></article>
     <article class="card state-card"><div class="card-kicker">DIRECTIONAL BIAS</div><div id="bias-state" class="big-state neutral">—</div><div id="bias-note" class="small">TAC / Source candidate</div></article>
     <article class="card state-card"><div class="card-kicker">HTF GATE</div><div id="htf-state" class="big-state neutral">—</div><div id="htf-note" class="small">1H / 4H</div></article>
-    <article class="card state-card"><div class="card-kicker">NEXT TAC / SOURCE</div><div id="pivot-state" class="big-state neutral">—</div><div id="pivot-note" class="small">—</div></article>
+    <article class="card state-card"><div class="card-kicker">NEXT EVENT</div><div id="pivot-state" class="big-state neutral">—</div><div id="pivot-note" class="small">—</div></article>
     <article class="card state-card"><div class="card-kicker">12H PROJECTION</div><div id="projection-state" class="big-state neutral">—</div><div id="projection-note" class="small">BTC orientativa</div></article>
   </section>
 
@@ -49,11 +49,11 @@
           <button class="tool-btn ghost" id="no-plan-btn" title="Oculta plan y opciones; deja sólo mercado y overlays elegidos">Sin plan</button>
           <button class="tool-btn sel" data-overlay="levels" title="POC, VAH, VAL, VWAP y TWAP">🎯 Niveles</button>
           <button class="tool-btn" data-overlay="liq" title="Liquidaciones REALIZADAS del monitor TAC; no es heatmap futuro">🧲 Liq</button>
-          <button class="tool-btn" data-overlay="medias" title="EMA 9/21/50 del contexto 1H">📉 Medias</button>
+          <button class="tool-btn" data-overlay="medias" title="EMA 9/21/50 calculadas y dibujadas sobre la temporalidad visible">📉 Medias</button>
           <button class="tool-btn ghost" id="fullscreen-btn">⛶ Pantalla completa</button>
         </div>
         <div class="chart-wrap"><canvas id="chart" width="1500" height="650"></canvas></div>
-        <div class="legend"><span class="legend-dot live"></span> Bitstamp <span class="legend-line long"></span> LONG geometry <span class="legend-line short"></span> SHORT geometry <span class="legend-line profile"></span> POC/VWAP/VA <span class="legend-line fractal"></span> <span id="fractal-legend">Fractal median / Q20–Q80</span> <span class="legend-line pivot"></span> pivots <span class="legend-line callwall"></span> Call Wall <span class="legend-line putwall"></span> Put Wall <span class="legend-line liqreal"></span> realized liq</div>
+        <div class="legend"><span class="legend-dot live"></span> Bitstamp <span class="legend-line long"></span> LONG geometry <span class="legend-line short"></span> SHORT geometry <span class="legend-line profile"></span> POC/VWAP/VA <span class="legend-line fractal"></span> <span id="fractal-legend">Fractal median / Q20–Q80</span> <span class="legend-line pivot"></span> pivots <span class="legend-line callwall"></span> Call Wall <span class="legend-line putwall"></span> Put Wall <span class="legend-line liqreal"></span> realized liq <span class="legend-line ema9"></span> EMA9 <span class="legend-line ema21"></span> EMA21 <span class="legend-line ema50"></span> EMA50</div>
       </article>
 
       <section class="panel-grid three">
@@ -68,13 +68,29 @@
       </section>
 
       <section class="panel-grid two">
-        <article class="card"><div class="card-kicker">SOURCE / PIVOTS</div><div id="pivots-panel"></div></article>
-        <article class="card"><div class="card-kicker">OPTIONS INTELLIGENCE · DERIBIT</div><div id="options-panel" class="metric-list"></div></article>
+        <article class="card">
+          <div class="pivot-card-head">
+            <div>
+              <div class="card-kicker">FULL TAC / SOURCE EVENT TIMELINE</div>
+              <div id="pivot-coverage-note" class="small">classified + display-only candidates</div>
+            </div>
+            <div class="pivot-filters">
+              <button class="pivot-filter-btn" data-pivot-hours="24">24H</button>
+              <button class="pivot-filter-btn sel" data-pivot-hours="48">48H</button>
+              <button class="pivot-filter-btn" data-pivot-hours="168">7D</button>
+              <button class="pivot-filter-btn sel" data-pivot-mode="ALL">ALL</button>
+              <button class="pivot-filter-btn" data-pivot-mode="CLASSIFIED">CLASSIFIED</button>
+            </div>
+          </div>
+          <div id="pivots-panel"></div>
+        </article>
+        <article class="card"><div class="card-kicker">DERIBIT MARKET / OI WALLS</div><div id="options-panel" class="metric-list"></div></article>
       </section>
     </div>
 
     <aside class="side-stack">
       <article class="card decision-card"><div id="decision-kicker" class="card-kicker">QUÉ HACER AHORA</div><div id="decision-detail"></div></article>
+      <article id="mode-options-card" class="card tactical-options-card"><div id="mode-options-kicker" class="card-kicker">TAC / FORK OPTIONS PLAN</div><div id="tactical-options-panel" class="metric-list"></div></article>
       <article class="card"><div class="card-kicker">PRISMA SWING</div><div class="row-between"><div id="swing-state" class="big-state neutral">—</div><select id="swing-tf"><option value="4h">4H</option><option value="1day" selected>1D</option><option value="1week">1W</option><option value="1month">1M</option></select></div><div id="swing-note" class="small"></div><div id="swing-plan" class="metric-list"></div></article>
       <article class="card"><div class="card-kicker">MARKET INTERNALS</div><div id="internals-panel" class="metric-list"></div></article>
       <article class="card"><div class="card-kicker">SYSTEM HEALTH</div><div id="system-panel" class="metric-list"></div></article>
@@ -82,7 +98,7 @@
     </aside>
   </section>
 </main>
-<footer>PRISMA CRYPTO v0.3.5 · SHADOW / DECISION SUPPORT · NO ORDERS · Bitstamp market data · D1 state distribution.</footer>
-<script type="module" src="/app.js?v=0.3.5"></script>
+<footer>PRISMA CRYPTO v0.3.8 · SHADOW / DECISION SUPPORT · NO ORDERS · Bitstamp market data · D1 state distribution.</footer>
+<script type="module" src="/app.js?v=0.3.8"></script>
 </body>
 </html>

@@ -1,4 +1,24 @@
-# PRISMA Crypto Cloud v0.3.5 — Swing Workspace Fix
+# PRISMA Crypto Cloud v0.3.8 — Full Event Timeline
+
+- Separates classified TAC/Source events from unclassified display-only candidates.
+- Removes the old 6/8-event UI cap. Timeline can show 24H / 48H / 7D.
+- Candidate events are visible but have `decision_effect: NONE`.
+- Tactical chart draws every event inside the visible horizon; candidates are faint.
+- Requires D1 publisher V6 / contract `PRISMA_CRYPTO_RICH_V5_FULL_EVENT_TIMELINE`.
+
+# PRISMA Crypto Cloud v0.3.7 — Medias + TAC Options Parity
+
+## Fixed in v0.3.7
+
+- **Medias are now true curves.** EMA9/EMA21/EMA50 are calculated from every candle of the active chart timeframe and rendered as polylines; the old horizontal single-value EMA overlays were removed.
+- Tactical EMA uses the selected 1m/5m/15m/1H/4H Bitstamp series. Swing EMA uses the selected 4H/1D/1W/1M Swing series.
+- Added a dedicated **TAC / FORK OPTIONS PLAN** next to the decision panel. It remains visible in Swing mode as explicitly separate tactical context.
+- The TAC options card shows SELECTED/WATCH ONLY, direction, strategy, legs, expiry, debit, max loss/profit, breakeven, option P&L at TAC TP1/TP2/TP3/SL, spread, OI and volume.
+- Swing mode no longer plots TAC option legs/breakeven as though they were Swing recommendations; only market OI walls may remain as context.
+- The lower Deribit module is now market/chain/wall intelligence, while the actionable/watch TAC options plan lives with the tactical decision.
+- No TAC/Fork/D1 trading logic changed. No orders.
+
+# Historical baseline: v0.3.5 — Swing Workspace Fix
 
 ## Fixed in v0.3.5
 

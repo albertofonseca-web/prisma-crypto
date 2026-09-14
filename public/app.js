@@ -1,5 +1,6 @@
 import { fetchBitstampCandles, BitstampLive, updateCurrentCandle } from './market.js';
 import { computePrismaSwing } from './prisma-swing.js';
+import { emaSeries, EMA_STYLE } from './indicators.js';
 
 const $ = id => document.getElementById(id);
 const PRICE_DEC = { BTC: 2, ETH: 2, XRP: 5 };
@@ -14,6 +15,8 @@ let swingCandles = [];
 let swingMeta = {};
 let lastTrade = null;
 const overlays = { plan:true, options:false, levels:true, liq:false, medias:false };
+let pivotHorizonHours = 48;
+let pivotMode = 'ALL';
 
 let chartLoadToken = 0;
 let swingLoadToken = 0;
@@ -42,6 +45,22 @@ function rich(){ return astate()?.rich||{}; }
 function optionsMarket(){ return rich().options_market||{}; }
 function liquidityLayers(){ return rich().liquidity_layers||{}; }
 function fmtOi(v){ const x=+v;if(!Number.isFinite(x))return '—';if(x>=1e6)return `${(x/1e6).toFixed(2)}M`;if(x>=1e3)return `${(x/1e3).toFixed(1)}K`;return x.toFixed(x<100?1:0); }
+function pivotTimeline(){
+  const p=rich().pivots||{};
+  const raw=Array.isArray(p.timeline)&&p.timeline.length?p.timeline:(p.next||[]);
+  return raw.filter(x=>Number.isFinite(Date.parse(x.pivot_utc))).sort((a,b)=>Date.parse(a.pivot_utc)-Date.parse(b.pivot_utc));
+}
+function isCandidateEvent(x){ return String(x?.display_class||'').toUpperCase()==='CANDIDATE'; }
+function pivotEventColor(x){
+  if(isCandidateEvent(x)) return '#8b8f95';
+  const s=String(x?.tac_label||x?.direction_hint||'').toUpperCase();
+  if(s.includes('BUY')||s.includes('BULL')||s.includes('LONG'))return '#15985a';
+  if(s.includes('SELL')||s.includes('BEAR')||s.includes('SHORT'))return '#d84a4a';
+  if(s.includes('C-TREND'))return '#e38b00';
+  if(s.includes('COUNTER'))return '#9a63c8';
+  if(s.includes('STRUCTURAL'))return '#198aa5';
+  return '#555';
+}
 
 async function loadChart(){
   const token=++chartLoadToken; $('market-health').textContent='Bitstamp cargando'; $('market-dot').className='dot warn';
@@ -112,12 +131,17 @@ function renderProjection(){
 }
 
 function renderPivot(){
-  const tac=astate()?.tac||{}; const rp=rich().pivots||{}; const n=(rp.next||[])[0]||{};
-  const iso=tac.next_pivot_utc||n.pivot_utc;
-  if(!iso){$('pivot-state').textContent='—';$('pivot-note').textContent='sin pivote publicado';return;}
-  const mins=Math.max(0,(Date.parse(iso)-Date.now())/60000); const label=tac.label||n.tac_label||tac.direction||'';
-  $('pivot-state').textContent=mins<60?`${Math.floor(mins)}m`:`${Math.floor(mins/60)}h ${Math.floor(mins%60)}m`; $('pivot-state').className=`big-state ${dirClass(label)}`;
-  const obs=rp.decision_effect==='NONE'?' · OBSERVATIONAL':''; $('pivot-note').textContent=`${label} · ${mtyTime(tac.next_pivot_monterrey||n.pivot_local||iso)}${obs}`;
+  const rp=rich().pivots||{};
+  const timeline=pivotTimeline();
+  const n=rp.next_event||timeline.find(x=>Date.parse(x.pivot_utc)>Date.now())||rp.next_classified||(rp.next||[])[0]||{};
+  const iso=n.pivot_utc;
+  if(!iso){$('pivot-state').textContent='—';$('pivot-note').textContent='sin evento publicado';return;}
+  const mins=Math.max(0,(Date.parse(iso)-Date.now())/60000);
+  const label=n.tac_label||n.direction_hint||'EVENT';
+  $('pivot-state').textContent=mins<60?`${Math.floor(mins)}m`:`${Math.floor(mins/60)}h ${Math.floor(mins%60)}m`;
+  $('pivot-state').className=`big-state ${isCandidateEvent(n)?'neutral':dirClass(label)}`;
+  const mode=isCandidateEvent(n)?'CANDIDATE · DISPLAY ONLY':(n.hierarchy||n.display_class||'CLASSIFIED');
+  $('pivot-note').textContent=`${label} · ${mtyTime(n.pivot_local||iso)} · ${mode}`;
 }
 
 function renderHTF(){
@@ -132,30 +156,91 @@ function renderLevels(){
 }
 
 function renderPivots(){
-  const p=rich().pivots||{}; const next=p.next||[]; const active=p.active_windows||[]; if(!next.length){$('pivots-panel').innerHTML='<div class="small">No hay calendario TAC/Source publicado.</div>';return;}
-  const rows=next.slice(0,6).map(x=>`<div class="pivot-row"><div class="pivot-time">${x.pivot_local_display||mtyTime(x.pivot_local||x.pivot_utc)}</div><div class="pivot-label ${dirClass(x.tac_label)==='long'?'pos':dirClass(x.tac_label)==='short'?'neg':'warn'}">${x.tac_label||'—'}</div><div>${x.event||'—'}</div></div>`).join('');
-  const chips=active.map(x=>`<span class="window-chip">${x.window_type||'WINDOW'} · ${x.polarity||''}</span>`).join('');
-  const note=p.decision_effect==='NONE'?'<div class="small warn" style="margin-bottom:7px">Calendario compartido mostrado como contexto · no entra al score ETH/XRP.</div>':'';
-  $('pivots-panel').innerHTML=`${note}<div class="pivot-list">${rows}</div>${chips?`<div class="small" style="margin-top:8px">Ventanas activas</div>${chips}`:''}`;
+  const p=rich().pivots||{}, now=Date.now(), end=now+pivotHorizonHours*3600e3;
+  let timeline=pivotTimeline().filter(x=>{const t=Date.parse(x.pivot_utc);return t>=now&&t<=end;});
+  if(pivotMode==='CLASSIFIED')timeline=timeline.filter(x=>!isCandidateEvent(x));
+  const coverage=p.coverage||{};
+  const classified=timeline.filter(x=>!isCandidateEvent(x)).length;
+  const candidates=timeline.filter(isCandidateEvent).length;
+  $('pivot-coverage-note').textContent=`${pivotHorizonHours===168?'7D':pivotHorizonHours+'H'} · ${classified} classified · ${candidates} candidates · candidates no alteran el motor`;
+
+  if(!timeline.length){$('pivots-panel').innerHTML='<div class="small">No hay eventos publicados en este horizonte.</div>';return;}
+  const rows=timeline.map(x=>{
+    const candidate=isCandidateEvent(x);
+    const label=x.tac_label||'—';
+    const cls=candidate?'candidate':'classified';
+    const tag=candidate?'UNCLASSIFIED':(x.hierarchy||x.display_class||'CLASSIFIED');
+    const color=pivotEventColor(x);
+    return `<div class="pivot-row ${cls}">
+      <div class="pivot-time">${x.pivot_local_display||mtyTime(x.pivot_local||x.pivot_utc)}</div>
+      <div><div class="pivot-label" style="color:${color}">${label}</div><div class="pivot-class">${tag}</div></div>
+      <div>${x.event||'—'}${candidate?'<div class="tiny">display only · decision effect NONE</div>':''}</div>
+    </div>`;
+  }).join('');
+  const active=(p.active_windows||[]).map(x=>`<span class="window-chip">${x.window_type||'WINDOW'} · ${x.polarity||''}</span>`).join('');
+  const summary=`<div class="pivot-summary"><span class="window-chip">${timeline.length} events</span><span class="window-chip">${classified} classified</span><span class="window-chip">${candidates} candidates</span></div>`;
+  const note=p.decision_effect&&String(p.decision_effect).includes('NONE')?'<div class="small warn" style="margin-bottom:7px">Candidatos y calendario compartido son contexto visual; no crean una entrada.</div>':'';
+  $('pivots-panel').innerHTML=`${note}${summary}<div class="pivot-list full">${rows}</div>${active?`<div class="small" style="margin-top:8px">Ventanas activas</div>${active}`:''}`;
 }
 
-function renderOptions(){
+function tacticalOptionContext(){
   const o=astate()?.options||{}, om=optionsMarket();
   const fallbackLong=Array.isArray(om.top_candidates?.long)?om.top_candidates.long[0]:om.top_candidates?.long;
   const fallbackShort=Array.isArray(om.top_candidates?.short)?om.top_candidates.short[0]:om.top_candidates?.short;
   const topLong=o.top_long||fallbackLong, topShort=o.top_short||fallbackShort;
-  const c=o.selected||(o.watch_direction==='SHORT'?topShort:topLong)||topLong||topShort;
+  const watch=String(o.watch_direction||astate()?.decision?.candidate||astate()?.tactical?.candidate_side||'').toUpperCase();
+  const candidate=o.selected||(watch==='SHORT'?topShort:watch==='LONG'?topLong:null)||topLong||topShort||null;
+  const execution=String(astate()?.decision?.action||'WAIT').toUpperCase();
+  const selected=!!o.selected && ['LONG','SHORT'].includes(execution);
+  return {o,om,topLong,topShort,candidate,execution,selected,watch};
+}
+
+function renderTacticalOptionsPlan(){
+  const el=$('tactical-options-panel'); if(!el)return;
+  const {o,om,topLong,topShort,candidate:c,execution,selected,watch}=tacticalOptionContext();
+  const status=selected?'SELECTED':c?'WATCH ONLY':'NO CANDIDATE';
+  const statusClass=selected?'pos':c?'warn':'neutral';
+  let html=`<div class="option-plan-callout ${selected?'selected':'watch'}"><div class="option-plan-status ${statusClass}">${status}</div><div class="option-plan-sub">TAC / Fork · ${execution==='WAIT'?'sin entrada confirmada':'execution '+execution} · Deribit public market data</div></div>`;
+  html+=metric('Tactical execution',execution,execution==='LONG'?'pos':execution==='SHORT'?'neg':'warn')+
+        metric('Watch direction',watch||o.watch_direction||'—',dirClass(watch)==='long'?'pos':dirClass(watch)==='short'?'neg':'warn');
+  if(c){
+    html+=metric('Strategy',c.strategy||'—')+
+      metric('Direction',c.direction||watch||'—',dirClass(c.direction||watch)==='long'?'pos':dirClass(c.direction||watch)==='short'?'neg':'warn')+
+      metric('Legs',c.legs||c.strikes||'—')+
+      metric('Expiry',mtyTime(c.expiry_utc))+
+      metric('Debit / cost',fmtMoney(c.entry_debit_usd_approx))+
+      metric('Max loss',fmtMoney(c.max_loss_usd_approx),'neg')+
+      metric('Max profit',fmtMoney(c.max_profit_usd_approx),'pos')+
+      metric('Breakeven',fmtPrice(c.breakeven_usd_approx))+
+      `<div class="option-scenario-title">IF TAC UNDERLYING REACHES</div>`+
+      metric('TP1 → option P&L',fmtMoney(c.pnl_tp1_usd_approx),(+c.pnl_tp1_usd_approx||0)>=0?'pos':'neg')+
+      metric('TP2 → option P&L',fmtMoney(c.pnl_tp2_usd_approx),(+c.pnl_tp2_usd_approx||0)>=0?'pos':'neg')+
+      metric('TP3 → option P&L',fmtMoney(c.pnl_tp3_usd_approx),(+c.pnl_tp3_usd_approx||0)>=0?'pos':'neg')+
+      metric('SL → option P&L',fmtMoney(c.pnl_sl_usd_approx),(+c.pnl_sl_usd_approx||0)>=0?'pos':'neg')+
+      metric('Spread',fmtPct(c.relative_spread_mean,1))+
+      metric('Min OI',fmtOi(c.min_open_interest))+
+      metric('Vol 24H',fmtOi(c.min_volume_24h));
+  }
+  const alt=[];
+  if(topLong && topLong!==c)alt.push(`<div><b>LONG watch</b><span>${topLong.strategy||'—'} · ${topLong.strikes||topLong.legs||'—'}</span></div>`);
+  if(topShort && topShort!==c)alt.push(`<div><b>SHORT watch</b><span>${topShort.strategy||'—'} · ${topShort.strikes||topShort.legs||'—'}</span></div>`);
+  if(alt.length) html+=`<div class="option-watch-alts">${alt.join('')}</div>`;
+  html+=`<div class="tiny option-warning">${chartMode==='SWING'?'Este plan pertenece al motor TAC/Fork y permanece separado del Swing. ':''}Las opciones nunca crean una entrada: TAC + HTF deben autorizar primero. ${c?.money_warning||''} · NO ORDERS.</div>`;
+  el.innerHTML=html;
+}
+
+function renderOptions(){
+  const {o,om,topLong,topShort,candidate:c,selected}=tacticalOptionContext();
   const nw=om.nearest_expiry||{}, cw=nw.call_wall||om.call_wall, pw=nw.put_wall||om.put_wall;
-  let html=metric('Screener',o.selected?'SELECTED':(c?'WATCH ONLY':'NO CANDIDATE'),o.selected?'pos':c?'warn':'neutral')+
-    metric('Source',om.source||'DERIBIT','pos')+
+  let html=metric('Chain source',om.source||'DERIBIT','pos')+
     metric('Chain age',om.generated_utc?ageText(om.generated_utc):'—',om.generated_utc&&Date.now()-Date.parse(om.generated_utc)<15*60e3?'pos':'warn')+
     metric('Call wall · nearest',cw?`${fmtPrice(cw.strike)} · OI ${fmtOi(cw.open_interest)}`:'NO DATA',cw?'':'warn')+
     metric('Put wall · nearest',pw?`${fmtPrice(pw.strike)} · OI ${fmtOi(pw.open_interest)}`:'NO DATA',pw?'':'warn')+
-    metric('Wall expiry',nw.expiry_utc?mtyTime(nw.expiry_utc):'—');
-  if(c){ html+=metric('Dirección',c.direction||o.watch_direction||'WAIT',dirClass(c.direction)==='long'?'pos':dirClass(c.direction)==='short'?'neg':'warn')+metric('Strategy',c.strategy||'—')+metric('Legs',c.legs||'—')+metric('Expiry',mtyTime(c.expiry_utc))+metric('Debit',fmtMoney(c.entry_debit_usd_approx))+metric('Max loss',fmtMoney(c.max_loss_usd_approx),'neg')+metric('Max profit',fmtMoney(c.max_profit_usd_approx),'pos')+metric('Breakeven',fmtPrice(c.breakeven_usd_approx))+metric('PnL TP1',fmtMoney(c.pnl_tp1_usd_approx),(+c.pnl_tp1_usd_approx||0)>=0?'pos':'neg')+metric('PnL TP2',fmtMoney(c.pnl_tp2_usd_approx),(+c.pnl_tp2_usd_approx||0)>=0?'pos':'neg')+metric('PnL TP3',fmtMoney(c.pnl_tp3_usd_approx),(+c.pnl_tp3_usd_approx||0)>=0?'pos':'neg')+metric('PnL SL',fmtMoney(c.pnl_sl_usd_approx),'neg')+metric('Spread',fmtPct(c.relative_spread_mean,1))+metric('Min OI',fmtOi(c.min_open_interest))+metric('Vol 24H',fmtOi(c.min_volume_24h)); }
-  const cards=(om.expiry_walls||[]).slice(0,5).map(x=>`<div class="option-rung"><b>${mtyTime(x.expiry_utc)}</b><span>C ${x.call_wall?fmtPrice(x.call_wall.strike):'—'} · P ${x.put_wall?fmtPrice(x.put_wall.strike):'—'}</span><small>${Number.isFinite(+x.hours_to_expiry)?`${(+x.hours_to_expiry).toFixed(0)}h`:''}</small></div>`).join('');
+    metric('Wall expiry',nw.expiry_utc?mtyTime(nw.expiry_utc):'—')+
+    metric('TAC options status',selected?'SELECTED':(c?'WATCH ONLY':'NO CANDIDATE'),selected?'pos':c?'warn':'neutral');
+  const cards=(om.expiry_walls||[]).slice(0,6).map(x=>`<div class="option-rung"><b>${mtyTime(x.expiry_utc)}</b><span>C ${x.call_wall?fmtPrice(x.call_wall.strike):'—'} · P ${x.put_wall?fmtPrice(x.put_wall.strike):'—'}</span><small>${Number.isFinite(+x.hours_to_expiry)?`${(+x.hours_to_expiry).toFixed(0)}h`:''}</small></div>`).join('');
   const alt=[]; if(topLong)alt.push(`<div><b>LONG</b> ${topLong.strategy||'—'} · ${topLong.strikes||topLong.legs||'—'}</div>`); if(topShort)alt.push(`<div><b>SHORT</b> ${topShort.strategy||'—'} · ${topShort.strikes||topShort.legs||'—'}</div>`);
-  $('options-panel').innerHTML=html+(alt.length?`<div class="option-alts">${alt.join('')}</div>`:'')+(cards?`<div class="option-ladder">${cards}</div>`:'')+`<div class="tiny option-warning">OI walls and option ideas are context only · score weight 0 · no orders.</div>`;
+  $('options-panel').innerHTML=html+(alt.length?`<div class="option-alts">${alt.join('')}</div>`:'')+(cards?`<div class="option-ladder">${cards}</div>`:'')+`<div class="tiny option-warning">Chain / OI walls / expiry ladder. El plan TAC operativo se muestra también junto a QUÉ HACER AHORA.</div>`;
 }
 
 function renderInternals(){
@@ -202,6 +287,7 @@ function renderModeContext(){
   $('tactical-tf-row')?.classList.toggle('hidden',swing); $('swing-tf-row')?.classList.toggle('hidden',!swing);
   if(swing){
     $('chart-kicker').textContent='PRISMA SWING MARKET MAP';
+    if($('mode-options-kicker'))$('mode-options-kicker').textContent='TAC / FORK OPTIONS · CONTEXT';
     $('chart-title').innerHTML=`Bitstamp · estructura + Fibonacci + plan Swing <span id="chart-coverage" class="badge warn">CHECKING</span>`;
     $('decision-kicker').textContent='SWING · QUÉ HACER AHORA';
     const p=swingState?.plan; const dir=p?.dir||'WAIT';
@@ -210,6 +296,7 @@ function renderModeContext(){
     $('decision-detail').innerHTML=swingDecisionHtml();
   }else{
     $('chart-kicker').textContent='TACTICAL MARKET MAP';
+    if($('mode-options-kicker'))$('mode-options-kicker').textContent='TAC / FORK OPTIONS PLAN';
     $('chart-title').innerHTML=`Bitstamp + TAC geometry + profiles + Source/Fractal <span id="chart-coverage" class="badge warn">CHECKING</span>`;
     $('decision-kicker').textContent='QUÉ HACER AHORA';
   }
@@ -229,12 +316,12 @@ function renderCoverage(){
     return;
   }
   const r=rich(), profiles=r.context_profiles||{}, fr=r.fractal||{}, tr=fr.trajectory||{}, piv=r.pivots||{};
-  const hasProfiles=Object.keys(profiles).length>0||Object.keys(r.htf_detail||{}).length>0; const hasFractal=(tr.times_utc||[]).length>1 && ((tr.median||tr.source_median||tr.technical_median||[]).length>1); const hasPivots=(piv.next||[]).length>0;
+  const hasProfiles=Object.keys(profiles).length>0||Object.keys(r.htf_detail||{}).length>0; const hasFractal=(tr.times_utc||[]).length>1 && ((tr.median||tr.source_median||tr.technical_median||[]).length>1); const hasPivots=((piv.timeline||[]).length>0)||((piv.next||[]).length>0);
   const ok=hasProfiles&&hasFractal&&hasPivots; el.textContent=ok?'FORK DATA COMPLETE':`MISSING ${[!hasProfiles?'TA':'',!hasFractal?'FRACTAL':'',!hasPivots?'PIVOTS':''].filter(Boolean).join(' / ')}`;el.className=`badge ${ok?'ok':'bad'}`;
   const legend=$('fractal-legend'); if(legend) legend.textContent=asset==='BTC'?'Source fractal median / Q20–Q80':'Technical fractal median / Q20–Q80';
 }
 
-function renderAll(){ renderCoverage(); updatePriceStrip(); const a=astate(); if(!a){$('execution-state').textContent='WAIT';$('execution-note').textContent='Esperando snapshot D1.';drawChart();return;} renderExecution();renderProjection();renderPivot();renderHTF();renderLevels();renderPivots();renderOptions();renderInternals();renderSwing();renderSystem();renderModeContext();renderCoverage();drawChart(); }
+function renderAll(){ renderCoverage(); updatePriceStrip(); const a=astate(); if(!a){$('execution-state').textContent='WAIT';$('execution-note').textContent='Esperando snapshot D1.';drawChart();return;} renderExecution();renderProjection();renderPivot();renderHTF();renderLevels();renderPivots();renderOptions();renderTacticalOptionsPlan();renderInternals();renderSwing();renderSystem();renderModeContext();renderCoverage();drawChart(); }
 
 function profileLevels(){
   const r=rich(), p=r.context_profiles||{}; const out=[]; const colors={POC:'#9a63c8',VWAP:'#e38b00',TWAP:'#4f7db7',VAH:'#198aa5',VAL:'#198aa5'};
@@ -263,11 +350,13 @@ function optionLevels(){
   const cw=nw.call_wall||om.call_wall, pw=nw.put_wall||om.put_wall;
   if(cw&&Number.isFinite(+cw.strike))out.push({value:+cw.strike,label:`CALL WALL OI ${fmtOi(cw.open_interest)}`,color:'#2878d7',dash:[7,3],kind:'option-wall'});
   if(pw&&Number.isFinite(+pw.strike))out.push({value:+pw.strike,label:`PUT WALL OI ${fmtOi(pw.open_interest)}`,color:'#cc45c8',dash:[7,3],kind:'option-wall'});
-  const o=astate()?.options||{}, c=o.selected||(o.watch_direction==='SHORT'?o.top_short:o.top_long)||o.top_long||o.top_short;
+  // Option legs belong to the TAC/Fork plan. In Swing mode we keep only market OI walls
+  // so a tactical Deribit candidate is never presented as a Swing recommendation.
+  const c=chartMode==='TACTICAL'?tacticalOptionContext().candidate:null;
   if(c){
     const strikes=String(c.strikes||'').split('/').map(Number).filter(Number.isFinite);
-    strikes.slice(0,4).forEach((v,i)=>out.push({value:v,label:`OPT LEG ${i+1}`,color:'#8357c5',dash:[2,3],kind:'option-plan'}));
-    if(Number.isFinite(+c.breakeven_usd_approx))out.push({value:+c.breakeven_usd_approx,label:'OPT B/E',color:'#b26b00',dash:[3,3],kind:'option-plan'});
+    strikes.slice(0,4).forEach((v,i)=>out.push({value:v,label:`TAC OPT LEG ${i+1}`,color:'#8357c5',dash:[2,3],kind:'option-plan'}));
+    if(Number.isFinite(+c.breakeven_usd_approx))out.push({value:+c.breakeven_usd_approx,label:'TAC OPT B/E',color:'#b26b00',dash:[3,3],kind:'option-plan'});
   }
   return out;
 }
@@ -276,11 +365,13 @@ function liquidationLevels(){
   const r=liquidityLayers().realized||{}, clusters=r.clusters_4h||[];
   return clusters.filter(x=>Number.isFinite(+x.weighted_price)).slice(0,8).map(x=>{const side=String(x.liquidated_side||'').toUpperCase();return{value:+x.weighted_price,label:`REALIZED ${side} LIQ ${fmtMoney(x.notional_usd)}`,color:side==='LONG'?'#cc45c8':'#2878d7',dash:[2,3],kind:'liq'};});
 }
-function mediaLevels(){
-  if(!overlays.medias)return[];
-  const h=rich().htf_detail||{}, one=h['1H']||{}, out=[]; const colors={ema9:'#1a9a62',ema21:'#6f74d8',ema50:'#555b66'};
-  for(const k of ['ema9','ema21','ema50'])if(Number.isFinite(+one[k]))out.push({value:+one[k],label:`1H ${k.toUpperCase()}`,color:colors[k],dash:k==='ema9'?[]:[4,3],kind:'media'});
-  return out;
+function visibleEmaCurves(rows, label){
+  if(!overlays.medias||!rows?.length)return[];
+  return [9,21,50].map(n=>{
+    const points=emaSeries(rows,n);
+    const style=EMA_STYLE[n];
+    return {n,label:`${label} EMA${n}`,points,color:style.color,width:style.width};
+  }).filter(x=>x.points.length>1);
 }
 
 function swingLevels(){
@@ -297,11 +388,6 @@ function swingStructureLevels(){
   if(!overlays.levels)return[]; const f=swingState?.fib;if(!f)return[];
   const rows=[['SW HIGH',f.swingHi,'#15985a',[3,3]],['FIB 38.2',f.l382,'#4f7db7',[3,3]],['FIB 50.0',f.l5,'#9a63c8',[3,3]],['FIB 61.8',f.l618,'#9a63c8',[3,3]],['FIB 78.6',f.l786,'#4f7db7',[3,3]],['SW LOW',f.swingLo,'#d84a4a',[3,3]]];
   return rows.filter(([,v])=>Number.isFinite(+v)).map(([label,value,color,dash])=>({label,value:+value,color,dash,kind:'swing-structure'}));
-}
-function emaValue(rows,n){ if(!rows?.length)return null; const k=2/(n+1); let e=+rows[0].c; for(let i=1;i<rows.length;i++)e=(+rows[i].c)*k+e*(1-k); return e; }
-function swingMediaLevels(rows){
-  if(!overlays.medias||!rows?.length)return[]; const colors={9:'#1a9a62',21:'#6f74d8',50:'#555b66'};
-  return [9,21,50].map(n=>({value:emaValue(rows.slice(-Math.max(n*5,80)),n),label:`${swingTfLabel()} EMA${n}`,color:colors[n],dash:n===9?[]:[4,3],kind:'media'})).filter(x=>Number.isFinite(+x.value));
 }
 
 function distributeLabelYs(items, yFn, top, bottom, minGap=13){
@@ -343,34 +429,38 @@ function drawChart(){
   const swingN=({'4h':180,'1day':110,'1week':104,'1month':72})[swingTf]||110;
   const series=source.slice(-(swing?swingN:220));
   const px=swing?(livePrice()||series.at(-1)?.c):(livePrice()||series.at(-1)?.c);
+  // Compute EMA on the full loaded series, then draw only the visible time window.
+  // This avoids the false flat horizontal 'EMA levels' used before v0.3.7.
+  const emaCurves=visibleEmaCurves(source, swing?swingTfLabel():chartTf.toUpperCase());
 
   let levels=[];
   if(!swing){
     if(overlays.plan)levels.push(...tacticalLevels());
     if(overlays.levels)levels.push(...profileLevels());
-    levels.push(...optionLevels(),...liquidationLevels(),...mediaLevels());
+    levels.push(...optionLevels(),...liquidationLevels());
     if(Number.isFinite(px))levels=levels.filter(x=>Math.abs(x.value/px-1)<((x.kind==='option-wall'||x.kind==='option-plan')?.18:.10));
   }else{
     if(overlays.plan)levels.push(...swingLevels());
     if(overlays.levels)levels.push(...swingStructureLevels(),...profileLevels());
-    levels.push(...optionLevels(),...liquidationLevels(),...swingMediaLevels(series));
+    levels.push(...optionLevels(),...liquidationLevels());
   }
 
   const fr=rich().fractal||{}, tr=fr.trajectory||{}; let times=tr.times_utc||[],med=tr.median||tr.source_median||tr.technical_median||[],q20=tr.q20||tr.source_q20||tr.technical_q20||[],q80=tr.q80||tr.source_q80||tr.technical_q80||[];
   const maxN={'1m':8,'5m':24,'15m':48,'1h':96,'4h':96}[chartTf]||48; times=times.slice(0,maxN);med=med.slice(0,maxN);q20=q20.slice(0,maxN);q80=q80.slice(0,maxN);
   const tMin=series[0].t; let tMax=series.at(-1).t;
   if(!swing&&times.length){const ft=Date.parse(times.at(-1));if(Number.isFinite(ft))tMax=Math.max(tMax,ft);}
-  if(!swing){const horizon=series.at(-1).t+24*3600e3; const fp=(rich().pivots?.next||[]).slice(0,6).map(x=>Date.parse(x.pivot_utc)).filter(x=>Number.isFinite(x)&&x<=horizon); if(fp.length)tMax=Math.max(tMax,...fp);}
+  if(!swing){const futureHours=['1m','5m','15m'].includes(chartTf)?24:48; const horizon=series.at(-1).t+futureHours*3600e3; const fp=pivotTimeline().map(x=>Date.parse(x.pivot_utc)).filter(x=>Number.isFinite(x)&&x<=horizon&&x>=series.at(-1).t); if(fp.length)tMax=Math.max(tMax,...fp);}
 
   let lo,hi;
+  const visibleEmaValues=emaCurves.flatMap(c=>c.points.filter(p=>p.t>=series[0].t&&p.t<=series.at(-1).t).map(p=>p.v)).filter(Number.isFinite);
   if(swing){
     // Critical Swing rule: viewport follows price structure, never distant TP/SL.
     // Far targets remain in the right plan panel and receive edge markers.
-    lo=Math.min(...series.map(c=>c.l)); hi=Math.max(...series.map(c=>c.h));
+    lo=Math.min(...series.map(c=>c.l),...visibleEmaValues); hi=Math.max(...series.map(c=>c.h),...visibleEmaValues);
     const raw=Math.max(hi-lo,Math.abs(series.at(-1)?.c||1)*.01); lo-=raw*.08;hi+=raw*.08;
   }else{
     const futureVals=[...med,...q20,...q80].filter(Number.isFinite);
-    lo=Math.min(...series.map(c=>c.l),...levels.map(x=>x.value),...futureVals); hi=Math.max(...series.map(c=>c.h),...levels.map(x=>x.value),...futureVals);
+    lo=Math.min(...series.map(c=>c.l),...levels.map(x=>x.value),...futureVals,...visibleEmaValues); hi=Math.max(...series.map(c=>c.h),...levels.map(x=>x.value),...futureVals,...visibleEmaValues);
     if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=px*.98;hi=px*1.02;}
     const span=Math.max(hi-lo,Math.abs(hi)*.001);lo-=span*.06;hi+=span*.06;
   }
@@ -387,9 +477,10 @@ function drawChart(){
   }
 
   if(!swing){
-    // Fork parity: last 3 + future TAC/Source pivots, vertical dotted and behind price.
-    const pp=rich().pivots||{}, piv=[...(pp.recent||[]).slice(-3),...(pp.next||[]).slice(0,6)];
-    piv.forEach(p=>{const tt=Date.parse(p.pivot_utc);if(!Number.isFinite(tt)||tt<tMin||tt>tMax)return;const xx=xTime(tt);ctx.save();ctx.strokeStyle='rgba(85,85,85,.58)';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ph);ctx.stroke();ctx.restore();});
+    // Full event display timeline. Classified TAC/Source events are stronger;
+    // unclassified astronomical candidates are intentionally faint and never affect decisions.
+    const pp=rich().pivots||{}, piv=[...(pp.recent||[]).slice(-3),...pivotTimeline()];
+    piv.forEach(p=>{const tt=Date.parse(p.pivot_utc);if(!Number.isFinite(tt)||tt<tMin||tt>tMax)return;const xx=xTime(tt),candidate=isCandidateEvent(p);ctx.save();ctx.strokeStyle=candidate?'rgba(120,124,130,.25)':pivotEventColor(p);ctx.globalAlpha=candidate?.52:.62;ctx.lineWidth=candidate?.8:1.15;ctx.setLineDash(candidate?[2,5]:[4,4]);ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ph);ctx.stroke();ctx.restore();});
 
     // Source/technical fractal.
     if(times.length&&med.length){
@@ -401,6 +492,19 @@ function drawChart(){
   // Candles. Swing intentionally uses PRISMA-style blue candles so mode is visually unmistakable.
   const bw=Math.max(1,Math.min(8,pw/series.length*.62));
   series.forEach(c=>{const xx=xTime(c.t),up=c.c>=c.o,col=swing?(up?'#6ba5e7':'#234f86'):(up?'#15985a':'#d84a4a');ctx.strokeStyle=col;ctx.fillStyle=col;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(xx,y(c.h));ctx.lineTo(xx,y(c.l));ctx.stroke();const top=y(Math.max(c.o,c.c)),bot=y(Math.min(c.o,c.c));ctx.fillRect(xx-bw/2,top,bw,Math.max(1,bot-top));});
+
+  // True moving averages: one point per candle, connected as curves.
+  // They are computed from the active visible timeframe, never a single 1H snapshot value.
+  if(overlays.medias){
+    emaCurves.forEach(curve=>{
+      const pts=curve.points.filter(p=>p.t>=tMin&&p.t<=series.at(-1).t&&Number.isFinite(p.v));
+      if(pts.length<2)return;
+      ctx.save();ctx.strokeStyle=curve.color;ctx.lineWidth=curve.width;ctx.globalAlpha=.90;ctx.setLineDash([]);ctx.beginPath();
+      pts.forEach((p,i)=>{const xx=xTime(p.t),yy=y(p.v);if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);});ctx.stroke();
+      const last=pts.at(-1); if(last){const ly=y(last.v);if(ly>=pad.t&&ly<=pad.t+ph){ctx.font='700 8px Space Mono';ctx.fillStyle=curve.color;ctx.textAlign='right';ctx.fillText(`EMA${curve.n}`,Math.min(plotRight-4,xTime(last.t)+50),ly-4);}}
+      ctx.restore();
+    });
+  }
 
   // Swing structure pivots from the actual PRISMA Swing series.
   if(swing){
@@ -415,7 +519,7 @@ function drawChart(){
   // Horizontal levels visible inside the price viewport only.
   visibleLevels.forEach(l=>{const yy=y(l.value);ctx.save();ctx.strokeStyle=l.color;ctx.globalAlpha=l.alpha??1;ctx.lineWidth=l.confirmed?1.5:1.1;ctx.setLineDash(l.dash||[]);ctx.beginPath();ctx.moveTo(plotLeft,yy);ctx.lineTo(plotRight,yy);ctx.stroke();ctx.restore();});
 
-  const leftKinds=swing?['profile','option-wall','liq','media','swing-structure']:['profile','option-wall','liq','media'];
+  const leftKinds=swing?['profile','option-wall','liq','swing-structure']:['profile','option-wall','liq'];
   const leftLabels=visibleLevels.filter(l=>leftKinds.includes(l.kind));
   const tacLabels=visibleLevels.filter(l=>l.kind==='tac');
   const optionPlanLabels=visibleLevels.filter(l=>l.kind==='option-plan');
@@ -456,9 +560,13 @@ function toggleOverlay(name){overlays[name]=!overlays[name];refreshOverlayButton
 function clearPlan(){overlays.plan=false;overlays.options=false;refreshOverlayButtons();drawChart();}
 async function toggleFullscreen(){const el=$('chart-card');try{if(!document.fullscreenElement)await el.requestFullscreen();else await document.exitFullscreen();}catch(e){console.warn(e);}setTimeout(drawChart,100);}
 
-function selectAsset(x){asset=x;document.querySelectorAll('.asset-btn').forEach(b=>b.classList.toggle('sel',b.dataset.asset===asset));live.connect(asset);loadChart();loadSwing();renderAll();}
+function selectAsset(x){asset=x;document.querySelectorAll('[data-pivot-hours]').forEach(b=>b.addEventListener('click',()=>{pivotHorizonHours=+b.dataset.pivotHours||48;document.querySelectorAll('[data-pivot-hours]').forEach(x=>x.classList.toggle('sel',+x.dataset.pivotHours===pivotHorizonHours));renderPivots();drawChart();}));
+document.querySelectorAll('[data-pivot-mode]').forEach(b=>b.addEventListener('click',()=>{pivotMode=b.dataset.pivotMode||'ALL';document.querySelectorAll('[data-pivot-mode]').forEach(x=>x.classList.toggle('sel',x.dataset.pivotMode===pivotMode));renderPivots();drawChart();}));
+document.querySelectorAll('.asset-btn').forEach(b=>b.classList.toggle('sel',b.dataset.asset===asset));live.connect(asset);loadChart();loadSwing();renderAll();}
 function selectTf(x){chartTf=x;document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('sel',b.dataset.tf===chartTf));loadChart();}
-function selectMode(x){chartMode=x;document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('sel',b.dataset.mode===chartMode));renderModeContext();renderCoverage();drawChart();}
+function selectMode(x){chartMode=x;document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('sel',b.dataset.mode===chartMode));renderModeContext();renderTacticalOptionsPlan();renderCoverage();drawChart();}
 function selectSwingTf(x){swingTf=x;document.querySelectorAll('.swing-tf-btn').forEach(b=>b.classList.toggle('sel',b.dataset.swingTf===swingTf));if($('swing-tf'))$('swing-tf').value=swingTf;loadSwing();}
+document.querySelectorAll('[data-pivot-hours]').forEach(b=>b.addEventListener('click',()=>{pivotHorizonHours=+b.dataset.pivotHours||48;document.querySelectorAll('[data-pivot-hours]').forEach(x=>x.classList.toggle('sel',+x.dataset.pivotHours===pivotHorizonHours));renderPivots();drawChart();}));
+document.querySelectorAll('[data-pivot-mode]').forEach(b=>b.addEventListener('click',()=>{pivotMode=b.dataset.pivotMode||'ALL';document.querySelectorAll('[data-pivot-mode]').forEach(x=>x.classList.toggle('sel',x.dataset.pivotMode===pivotMode));renderPivots();drawChart();}));
 document.querySelectorAll('.asset-btn').forEach(b=>b.addEventListener('click',()=>selectAsset(b.dataset.asset)));document.querySelectorAll('.tf-btn').forEach(b=>b.addEventListener('click',()=>selectTf(b.dataset.tf)));document.querySelectorAll('.swing-tf-btn').forEach(b=>b.addEventListener('click',()=>selectSwingTf(b.dataset.swingTf)));document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click',()=>selectMode(b.dataset.mode)));document.querySelectorAll('[data-overlay]').forEach(b=>b.addEventListener('click',()=>toggleOverlay(b.dataset.overlay)));$('no-plan-btn')?.addEventListener('click',clearPlan);$('fullscreen-btn')?.addEventListener('click',toggleFullscreen);$('swing-tf').addEventListener('change',e=>selectSwingTf(e.target.value));document.addEventListener('fullscreenchange',()=>setTimeout(drawChart,80));window.addEventListener('resize',drawChart);setInterval(()=>{renderPivot();$('engine-age').textContent=engineState?.generated_utc?ageText(engineState.generated_utc):'—';},1000);setInterval(loadState,30000);setInterval(loadGuard,5*60*1000);refreshOverlayButtons();
 await Promise.allSettled([loadState(),loadChart(),loadSwing(),loadGuard()]);live.connect(asset);renderAll();

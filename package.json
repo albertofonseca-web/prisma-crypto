@@ -1,12 +1,12 @@
 {
   "name": "prisma-crypto-cloud",
-  "version": "0.3.5",
+  "version": "0.3.8",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "check": "node --check src/index.js && node --check public/app.js && node --check public/prisma-swing.js && node --check public/market.js"
+    "check": "node --check src/index.js && node --check public/app.js && node --check public/prisma-swing.js && node --check public/market.js && node --check public/indicators.js && node tests/test-indicators.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

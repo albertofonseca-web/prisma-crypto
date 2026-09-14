@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-const APP_VERSION = "0.3.5";
+const APP_VERSION = "0.3.8";
 const HUB_NAME = "global";
 const ASSETS = new Set(["BTC", "ETH", "XRP"]);
 const TF_MAP = {
@@ -173,7 +173,7 @@ async function bitstampOhlcPage(asset, step, limit = 1000, end = null) {
   const params = new URLSearchParams({ step: String(step), limit: String(limit) });
   if (end) params.set("end", String(Math.floor(end / 1000)));
   const upstream = `https://www.bitstamp.net/api/v2/ohlc/${symbol}/?${params.toString()}`;
-  const response = await fetch(upstream, { headers: { "user-agent": "PRISMA-Crypto/0.3.5" } });
+  const response = await fetch(upstream, { headers: { "user-agent": "PRISMA-Crypto/0.3.8" } });
   if (!response.ok) throw new Error(`Bitstamp HTTP ${response.status}`);
   const body = await response.json();
   const rows = (body?.data?.ohlc || []).map(x => ({
