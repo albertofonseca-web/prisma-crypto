@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.2.0";
 const HUB_NAME = "global";
 const ASSETS = new Set(["BTC", "ETH", "XRP"]);
 const TF_MAP = {
@@ -27,6 +27,63 @@ function json(data, status = 200, extraHeaders = {}) {
       ...extraHeaders
     }
   });
+}
+
+
+async function d1Latest(env) {
+  if (!env.DB) throw new Error("D1 binding DB no configurado");
+  const row = await env.DB.prepare(
+    "SELECT generated_utc, state_hash, schema_version, payload, updated_at FROM crypto_state_latest WHERE id = 1"
+  ).first();
+  if (!row) return null;
+  let payload = null;
+  try { payload = JSON.parse(row.payload); }
+  catch (error) { throw new Error(`D1 payload inválido: ${error.message || error}`); }
+  return {
+    payload,
+    generated_utc: row.generated_utc,
+    state_hash: row.state_hash,
+    schema_version: row.schema_version,
+    updated_at: row.updated_at
+  };
+}
+
+async function handleD1State(env) {
+  try {
+    const latest = await d1Latest(env);
+    return json({
+      status: "ok",
+      source: "D1",
+      data: latest?.payload || null,
+      meta: latest ? {
+        generated_utc: latest.generated_utc,
+        state_hash: latest.state_hash,
+        schema_version: latest.schema_version,
+        updated_at: latest.updated_at
+      } : null
+    });
+  } catch (error) {
+    return json({ status: "error", source: "D1", message: String(error.message || error) }, 503);
+  }
+}
+
+async function handleD1Health(env) {
+  try {
+    const latest = await d1Latest(env);
+    const generated = latest?.generated_utc ? Date.parse(latest.generated_utc) : NaN;
+    const age = Number.isFinite(generated) ? Math.max(0, Math.round((Date.now() - generated) / 1000)) : null;
+    return json({
+      status: "ok",
+      worker_version: APP_VERSION,
+      state_source: "D1",
+      latest_state: latest ? "available" : "empty",
+      state_age_seconds: age,
+      state_hash: latest?.state_hash || null,
+      d1_updated_at: latest?.updated_at || null
+    });
+  } catch (error) {
+    return json({ status: "degraded", worker_version: APP_VERSION, state_source: "D1", error: String(error.message || error) }, 503);
+  }
 }
 
 function hub(env) {
@@ -181,17 +238,11 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/health") {
-      try {
-        const response = await hub(env).fetch("https://hub/health");
-        const body = await response.json();
-        return json({ status: "ok", worker_version: APP_VERSION, ...body });
-      } catch (error) {
-        return json({ status: "degraded", worker_version: APP_VERSION, error: String(error.message || error) }, 503);
-      }
+      return handleD1Health(env);
     }
 
     if (url.pathname === "/api/state") {
-      return hub(env).fetch("https://hub/state");
+      return handleD1State(env);
     }
 
     if (url.pathname === "/api/usage") {

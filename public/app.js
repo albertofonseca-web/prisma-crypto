@@ -99,38 +99,18 @@ async function loadSwing() {
 
 async function loadInitialEngineState() {
   try {
-    const r = await fetch("/api/state", { cache: "no-store" });
+    const r = await fetch(`/api/state?ts=${Date.now()}`, { cache: "no-store" });
     const body = await r.json();
+    if (!r.ok || body.status !== "ok") throw new Error(body.message || `HTTP ${r.status}`);
     engineState = body.data || null;
-  } catch (_) {}
-  renderAll();
-}
-
-function connectEngineSocket() {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(`${proto}//${location.host}/api/ws`);
-  ws.onopen = () => {
-    $("engine-dot").className = "dot ok";
-    $("engine-health").textContent = "Motor live";
-  };
-  ws.onmessage = event => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg.type === "state") {
-        engineState = msg.data;
-        renderAll();
-      }
-    } catch (_) {}
-  };
-  ws.onerror = () => {
+    $("engine-dot").className = engineState ? "dot ok" : "dot warn";
+    $("engine-health").textContent = engineState ? "Motor D1 live" : "D1 sin snapshot";
+  } catch (error) {
     $("engine-dot").className = "dot err";
-    $("engine-health").textContent = "Motor error";
-  };
-  ws.onclose = () => {
-    $("engine-dot").className = "dot warn";
-    $("engine-health").textContent = "Motor reconectando";
-    setTimeout(connectEngineSocket, 2200 + Math.random() * 1200);
-  };
+    $("engine-health").textContent = "D1 error";
+    console.error("D1 state", error);
+  }
+  renderAll();
 }
 
 async function loadUsage() {
@@ -307,9 +287,9 @@ function renderAll() {
   const a = finalAssetState();
   if (!a) {
     $("engine-dot").className = "dot warn";
-    $("engine-health").textContent = "Motor esperando publisher";
+    $("engine-health").textContent = "D1 esperando snapshot";
     $("tactical-state").textContent = "WAIT";
-    $("tactical-note").textContent = "Corre el publisher desde Colab después del deploy.";
+    $("tactical-note").textContent = "Esperando el primer snapshot de D1.";
     $("htf-state").textContent = "—";
     $("pivot-state").textContent = "—";
     $("tactical-plan").innerHTML = metric("Estado", "SIN SNAPSHOT", "warn");
@@ -420,8 +400,8 @@ $("swing-tf").addEventListener("change", e => { swingTf = e.target.value; loadSw
 window.addEventListener("resize", () => drawChart());
 setInterval(() => { renderPivot(finalAssetState()); $("engine-age").textContent = engineState?.generated_utc ? ageText(engineState.generated_utc) : "—"; }, 1000);
 setInterval(loadUsage, 5 * 60 * 1000);
+setInterval(loadInitialEngineState, 30 * 1000);
 
 await Promise.allSettled([loadInitialEngineState(), loadChart(), loadSwing(), loadUsage()]);
 live.connect(asset);
-connectEngineSocket();
 renderAll();

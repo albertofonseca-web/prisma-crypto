@@ -1,3 +1,7 @@
+# PRISMA Crypto Cloud v0.2 — D1 live state
+
+**Cambio v0.2:** el frontend ya no espera que TAC publique al Durable Object. `GET /api/state` lee directamente `crypto_state_latest` desde el binding D1 `DB`; el navegador refresca ese estado cada 30 segundos. Bitstamp sigue directo/live para mercado y PRISMA Swing conserva su flujo separado.
+
 # PRISMA Crypto Cloud v0.1
 
 Terminal especializada para **BTC / ETH / XRP** que mantiene separados:
