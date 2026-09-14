@@ -1,0 +1,87 @@
+{
+  "package": "PRISMA_CRYPTO_CLOUD",
+  "version": "0.1.0",
+  "generated_utc": "2026-09-14T02:05:00Z",
+  "files": [
+    {
+      "path": ".dev.vars.example",
+      "size_bytes": 48,
+      "sha256": "5a1ed7555577fc386efe50cb383a59805d67a0e79fa1936ac46661ac90e08598"
+    },
+    {
+      "path": ".gitignore",
+      "size_bytes": 51,
+      "sha256": "2f9bed20d7c25589701d309fbac0f2138a88410c5c0b57acb4ae548de41987a9"
+    },
+    {
+      "path": "README.md",
+      "size_bytes": 7403,
+      "sha256": "1ee529d34a0f5c2e1728297250a6ad9e6ff382135e08e2af27571d98c22e0955"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "size_bytes": 918,
+      "sha256": "e77d53371f2b08a2ec89d6b1a9fd408850b509f60789ac07d5ce52343b4b4ff6"
+    },
+    {
+      "path": "package.json",
+      "size_bytes": 373,
+      "sha256": "31095e2a5e09d08a3d829af691b2f6742cf513b7bab68336b864b425589713a7"
+    },
+    {
+      "path": "public/app.js",
+      "size_bytes": 21390,
+      "sha256": "39678e581333a6159fd3d8f8d193d314fb67852147f2975e724c30c26255b73b"
+    },
+    {
+      "path": "public/index.html",
+      "size_bytes": 5964,
+      "sha256": "33e17c33a0ed76140d77383cdbcc1090a04a9edcbc61f6760e032567aa948a03"
+    },
+    {
+      "path": "public/market.js",
+      "size_bytes": 3762,
+      "sha256": "6cd0d18c1e37af00816fba74d58e7cb009f1b6529a55087837cc44032fcb45f1"
+    },
+    {
+      "path": "public/prisma-swing.js",
+      "size_bytes": 10058,
+      "sha256": "eeef611c2d243b0581585c6e747d9f290fce6191f0addd6b98600d4f8066d603"
+    },
+    {
+      "path": "public/styles.css",
+      "size_bytes": 6159,
+      "sha256": "ea6cb552d5e6e6b72236c8c4614338fae111f9768504a29e5ca5626d0201774f"
+    },
+    {
+      "path": "publisher/TAC_CLOUDFLARE_PUBLISHER_V1.py",
+      "size_bytes": 13234,
+      "sha256": "3fabe7000ce9df8bd0efc898cac3c07549c8a3e09d1e84c65a072db9a5995b0a"
+    },
+    {
+      "path": "schema/crypto_state.schema.json",
+      "size_bytes": 1736,
+      "sha256": "dddf65804f1ab4c64e79a66d1ee4b1ac439a7651aeec065e60295cc4cf30834c"
+    },
+    {
+      "path": "src/index.js",
+      "size_bytes": 12832,
+      "sha256": "fa69fc1fe1ce6e451068bc45190fc2168e8b26bbbaf053c6746024edc62fa5df"
+    },
+    {
+      "path": "tests/smoke-swing.mjs",
+      "size_bytes": 775,
+      "sha256": "a837ba12246406eb376e307540ccc0ae4b644f672fc4b978381ba25b7426cd79"
+    },
+    {
+      "path": "tests/test-publisher.py",
+      "size_bytes": 621,
+      "sha256": "4e9fc077b50c090defe4f8243d1eed917ea8ce3140434de08667617e7c2c2e13"
+    },
+    {
+      "path": "wrangler.jsonc",
+      "size_bytes": 544,
+      "sha256": "f42b60079a3e8d689dcbb7423380d45b6d11e31856f201e6632aadcb0cb97382"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prisma.local/schema/crypto_state.schema.json",
+  "title": "PRISMA Crypto State",
+  "type": "object",
+  "required": ["schema_version", "generated_utc", "mode", "orders_enabled", "assets", "system"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "publisher_version": { "type": "string" },
+    "generated_utc": { "type": "string" },
+    "state_hash": { "type": "string" },
+    "mode": { "type": "string" },
+    "orders_enabled": { "const": false },
+    "assets": {
+      "type": "object",
+      "required": ["BTC", "ETH", "XRP"],
+      "additionalProperties": false,
+      "properties": {
+        "BTC": { "$ref": "#/$defs/asset" },
+        "ETH": { "$ref": "#/$defs/asset" },
+        "XRP": { "$ref": "#/$defs/asset" }
+      }
+    },
+    "system": { "type": "object" }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "required": ["decision", "tactical", "htf", "tac", "options"],
+      "properties": {
+        "market_ref": { "type": "object" },
+        "decision": {
+          "type": "object",
+          "required": ["action", "candidate", "actionable"],
+          "properties": {
+            "action": { "enum": ["LONG", "SHORT", "WAIT"] },
+            "candidate": { "type": "string" },
+            "actionable": { "type": "boolean" },
+            "reason": { "type": ["string", "null"] }
+          }
+        },
+        "tactical": { "type": "object" },
+        "htf": { "type": "object" },
+        "tac": { "type": "object" },
+        "options": { "type": "object" },
+        "funding": { "type": "object" },
+        "liquidations": { "type": "object" },
+        "performance": { "type": "object" }
+      }
+    }
+  }
+}
