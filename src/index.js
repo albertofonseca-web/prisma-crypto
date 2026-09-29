@@ -1,21 +1,15 @@
 import { DurableObject } from "cloudflare:workers";
 
-const APP_VERSION = "0.3.8";
+const APP_VERSION = "0.4.0";
 const HUB_NAME = "global";
-const ASSETS = new Set(["BTC", "ETH", "XRP"]);
-const TF_MAP = {
-  "5m": "5",
-  "15m": "15",
-  "1h": "60",
-  "4h": "240",
-  "1day": "D",
-  "1week": "W",
-  "1month": "M"
+const ASSETS = new Set(["BTC","ETH","XRP","GC","MXN","CL","NG","ZW","ZC","ES","NQ"]);
+const CRYPTO_ASSETS = new Set(["BTC","ETH","XRP"]);
+const YAHOO_TICKER = {
+  GC:"GC=F", MXN:"MXN=X", CL:"CL=F", NG:"NG=F", ZW:"ZW=F", ZC:"ZC=F", ES:"ES=F", NQ:"NQ=F"
 };
-const KRAKEN_PAIR = {
-  BTC: "XBTUSD", BTCUSDT: "XBTUSD",
-  ETH: "ETHUSD", ETHUSDT: "ETHUSD",
-  XRP: "XRPUSD", XRPUSDT: "XRPUSD"
+const TACTICAL_TFS = new Set(["1m","5m","15m","1h","4h"]);
+const TF_MAP = {
+  "1m":"1","5m":"5","15m":"15","1h":"60","4h":"240"
 };
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -124,44 +118,6 @@ function saneaVelas(rows) {
   return segments.reduce((best, current) => current.length > best.length ? current : best, segments[0]);
 }
 
-async function bybitSeries(asset, tf) {
-  const interval = TF_MAP[tf];
-  if (!interval) throw new Error(`timeframe no soportado: ${tf}`);
-  const symbol = `${asset}USDT`;
-  const url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${symbol}&interval=${interval}&limit=1000`;
-  const response = await fetch(url, { headers: { "user-agent": "PRISMA-Crypto/0.1" } });
-  if (!response.ok) throw new Error(`Bybit HTTP ${response.status}`);
-  const body = await response.json();
-  if (body.retCode !== 0) throw new Error(`Bybit ${body.retMsg || body.retCode}`);
-  const list = body.result?.list || [];
-  const rows = list
-    .map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5] || 0 }))
-    .filter(x => Number.isFinite(x.c) && x.c > 0);
-  if (rows.length < 10) throw new Error("Bybit serie vacía");
-  return saneaVelas(rows);
-}
-
-async function krakenSeries(asset, tf) {
-  const pair = KRAKEN_PAIR[asset];
-  if (!pair) throw new Error(`Kraken pair no configurado para ${asset}`);
-  const minutes = { "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1day": 1440, "1week": 10080 }[tf];
-  if (!minutes) {
-    if (tf === "1month") return krakenSeries(asset, "1week");
-    throw new Error(`timeframe Kraken no soportado: ${tf}`);
-  }
-  const url = `https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=${minutes}`;
-  const response = await fetch(url, { headers: { "user-agent": "PRISMA-Crypto/0.1" } });
-  if (!response.ok) throw new Error(`Kraken HTTP ${response.status}`);
-  const body = await response.json();
-  if (body.error?.length) throw new Error(`Kraken ${body.error[0]}`);
-  const key = Object.keys(body.result || {}).find(k => k !== "last");
-  const data = body.result?.[key] || [];
-  const rows = data
-    .map(x => ({ t: +x[0] * 1000, o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[6] || 0 }))
-    .filter(x => Number.isFinite(x.c) && x.c > 0);
-  if (rows.length < 10) throw new Error("Kraken serie vacía");
-  return saneaVelas(rows);
-}
 
 function bitstampSymbol(asset) {
   return { BTC: "btcusd", ETH: "ethusd", XRP: "xrpusd" }[asset];
@@ -173,7 +129,7 @@ async function bitstampOhlcPage(asset, step, limit = 1000, end = null) {
   const params = new URLSearchParams({ step: String(step), limit: String(limit) });
   if (end) params.set("end", String(Math.floor(end / 1000)));
   const upstream = `https://www.bitstamp.net/api/v2/ohlc/${symbol}/?${params.toString()}`;
-  const response = await fetch(upstream, { headers: { "user-agent": "PRISMA-Crypto/0.3.8" } });
+  const response = await fetch(upstream, { headers: { "user-agent": "PRISMA-Crypto/0.4.0" } });
   if (!response.ok) throw new Error(`Bitstamp HTTP ${response.status}`);
   const body = await response.json();
   const rows = (body?.data?.ohlc || []).map(x => ({
@@ -183,60 +139,84 @@ async function bitstampOhlcPage(asset, step, limit = 1000, end = null) {
   return saneaVelas(rows);
 }
 
-function aggregateCandles(rows, mode) {
-  const buckets = new Map();
-  for (const x of rows) {
-    const d = new Date(x.t);
-    let key, t;
-    if (mode === "1week") {
-      const day = d.getUTCDay() || 7;
-      const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day + 1));
-      t = monday.getTime(); key = String(t);
-    } else if (mode === "1month") {
-      t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1); key = String(t);
-    } else throw new Error(`aggregate mode no soportado: ${mode}`);
-    const b = buckets.get(key);
-    if (!b) buckets.set(key, { t, o:x.o, h:x.h, l:x.l, c:x.c, v:x.v || 0 });
-    else { b.h = Math.max(b.h, x.h); b.l = Math.min(b.l, x.l); b.c = x.c; b.v += x.v || 0; }
+
+async function prismaSeries(asset, tf) {
+  if (!ASSETS.has(asset) || !TACTICAL_TFS.has(tf)) throw new Error(`timeframe táctico no soportado: ${tf}`);
+  if (CRYPTO_ASSETS.has(asset)) {
+    const step = {"1m":60,"5m":300,"15m":900,"1h":3600,"4h":14400}[tf];
+    return { candles: await bitstampOhlcPage(asset, step, 500), source: "BITSTAMP" };
+  }
+  return { candles: await yahooSeries(asset, tf), source: "YAHOO_FINANCE" };
+}
+
+
+
+function aggregateFixed(rows, hours) {
+  const ms=hours*3600e3, buckets=new Map();
+  for(const x of rows){
+    const t=Math.floor(x.t/ms)*ms, k=String(t), b=buckets.get(k);
+    if(!b)buckets.set(k,{t,o:x.o,h:x.h,l:x.l,c:x.c,v:x.v||0});
+    else{b.h=Math.max(b.h,x.h);b.l=Math.min(b.l,x.l);b.c=x.c;b.v+=x.v||0;}
   }
   return [...buckets.values()].sort((a,b)=>a.t-b.t);
 }
 
-async function bitstampDailyHistory(asset, pages = 4) {
-  let all = [], end = null;
-  for (let i = 0; i < pages; i++) {
-    const page = await bitstampOhlcPage(asset, 86400, 1000, end);
-    all.push(...page);
-    const first = page[0]?.t;
-    if (!Number.isFinite(first) || page.length < 2) break;
-    end = first - 86400e3;
+async function yahooSeries(asset, tf) {
+  const ticker=YAHOO_TICKER[asset];
+  if(!ticker)throw new Error(`Yahoo ticker no configurado para ${asset}`);
+  const spec={
+    "1m":{interval:"1m",range:"7d"},
+    "5m":{interval:"5m",range:"60d"},
+    "15m":{interval:"15m",range:"60d"},
+    "1h":{interval:"1h",range:"730d"},
+    "4h":{interval:"1h",range:"730d",aggregate:4}
+  }[tf];
+  if(!spec)throw new Error(`timeframe táctico no soportado: ${tf}`);
+  const q=new URLSearchParams({interval:spec.interval,range:spec.range,includePrePost:"true",events:"div,splits"});
+  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?${q.toString()}`;
+  const response=await fetch(url,{headers:{"user-agent":"PRISMA-Crypto/0.4"}});
+  if(!response.ok)throw new Error(`Yahoo HTTP ${response.status}`);
+  const body=await response.json(), chart=body?.chart||{};
+  if(chart.error)throw new Error(`Yahoo ${chart.error.description||chart.error.code||"error"}`);
+  const result=chart.result?.[0], ts=result?.timestamp||[], quote=result?.indicators?.quote?.[0]||{};
+  const rows=[];
+  for(let i=0;i<ts.length;i++){
+    const o=+quote.open?.[i],h=+quote.high?.[i],l=+quote.low?.[i],c=+quote.close?.[i],v=+quote.volume?.[i]||0;
+    if([o,h,l,c].every(Number.isFinite)&&c>0)rows.push({t:+ts[i]*1000,o,h,l,c,v});
   }
-  return saneaVelas(all);
+  if(rows.length<10)throw new Error("Yahoo serie vacía");
+  const clean=saneaVelas(rows);
+  return spec.aggregate?aggregateFixed(clean,spec.aggregate):clean;
 }
 
-async function prismaSeries(asset, tf) {
-  // PRISMA Crypto uses Bitstamp as the canonical market-price source.
-  // 4H/1D come directly from Bitstamp; 1W/1M are aggregated from Bitstamp daily OHLC.
-  if (tf === "4h") return { candles: await bitstampOhlcPage(asset, 14400, 1000), source: "BITSTAMP" };
-  if (tf === "1day") return { candles: await bitstampOhlcPage(asset, 86400, 1000), source: "BITSTAMP" };
-  if (tf === "1week") {
-    const daily = await bitstampDailyHistory(asset, 2);
-    return { candles: aggregateCandles(daily, "1week"), source: "BITSTAMP_AGG_WEEK" };
-  }
-  if (tf === "1month") {
-    const daily = await bitstampDailyHistory(asset, 4);
-    return { candles: aggregateCandles(daily, "1month"), source: "BITSTAMP_AGG_MONTH" };
-  }
-  throw new Error(`timeframe PRISMA Swing no soportado: ${tf}`);
+async function handleMarketOhlc(request) {
+  const url=new URL(request.url);
+  const asset=(url.searchParams.get("asset")||"BTC").toUpperCase();
+  const tf=url.searchParams.get("tf")||"15m";
+  if(!ASSETS.has(asset)||!TACTICAL_TFS.has(tf))return json({status:"error",message:"asset/timeframe táctico no permitido"},400);
+  const cache=caches.default, ck=new Request(`${url.origin}/__cache/market?asset=${asset}&tf=${tf}`);
+  const cached=await cache.match(ck); if(cached)return cached;
+  try{
+    let rows,source;
+    if(CRYPTO_ASSETS.has(asset)){
+      const step={"1m":60,"5m":300,"15m":900,"1h":3600,"4h":14400}[tf];
+      rows=await bitstampOhlcPage(asset,step,500); source="BITSTAMP";
+    }else{
+      rows=await yahooSeries(asset,tf); source="YAHOO_FINANCE";
+    }
+    rows=rows.slice(-500);
+    const ttl={"1m":20,"5m":60,"15m":120,"1h":300,"4h":600}[tf]||120;
+    const out=json({status:"ok",source,asset,tf,generated_utc:new Date().toISOString(),candles:rows},200,{"cache-control":`public, s-maxage=${ttl}`});
+    await cache.put(ck,out.clone()); return out;
+  }catch(error){return json({status:"error",message:String(error.message||error)},502);}
 }
-
 
 async function handleBitstampOhlc(request) {
   const url = new URL(request.url);
   const asset = (url.searchParams.get("asset") || "BTC").toUpperCase();
   const tf = url.searchParams.get("tf") || "1m";
   const symbol = { BTC: "btcusd", ETH: "ethusd", XRP: "xrpusd" }[asset];
-  const step = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400 }[tf];
+  const step = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400 }[tf];
   if (!symbol || !step) return json({ status: "error", message: "asset/timeframe no permitido" }, 400);
   const upstream = `https://www.bitstamp.net/api/v2/ohlc/${symbol}/?step=${step}&limit=360`;
   const cache = caches.default;
@@ -262,9 +242,9 @@ async function handleBitstampOhlc(request) {
 async function handlePrismaSeries(request) {
   const url = new URL(request.url);
   const asset = (url.searchParams.get("asset") || "BTC").toUpperCase();
-  const tf = url.searchParams.get("tf") || "1day";
+  const tf = url.searchParams.get("tf") || "15m";
   if (!ASSETS.has(asset)) return json({ status: "error", message: "asset no permitido" }, 400);
-  if (!TF_MAP[tf]) return json({ status: "error", message: "timeframe no permitido" }, 400);
+  if (!TACTICAL_TFS.has(tf)) return json({ status: "error", message: "timeframe táctico no permitido" }, 400);
 
   const cache = caches.default;
   const cacheKey = new Request(`${url.origin}/__cache/prisma-series?asset=${asset}&tf=${tf}`);
@@ -273,7 +253,7 @@ async function handlePrismaSeries(request) {
 
   try {
     const result = await prismaSeries(asset, tf);
-    const ttl = { "5m": 60, "15m": 120, "1h": 300, "4h": 900, "1day": 1800, "1week": 7200, "1month": 21600 }[tf] || 300;
+    const ttl = { "1m": 20, "5m": 60, "15m": 120, "1h": 300, "4h": 900 }[tf] || 300;
     const response = json({
       status: "ok",
       asset,
@@ -334,6 +314,10 @@ export default {
       });
     }
 
+
+    if (url.pathname === "/api/market-ohlc") {
+      return handleMarketOhlc(request);
+    }
 
     if (url.pathname === "/api/bitstamp-ohlc") {
       return handleBitstampOhlc(request);
